@@ -1,97 +1,74 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+This repository hosts the SparkRunner user app built with React Native CLI. It is the local entry point for testing the mobile UI while connecting to the orchestrator repo (auth-server-service + scooter mock via Docker Compose).
 
-# Getting Started
+# Requirements
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+- Node.js ≥ 20 (nvm recommended for version switching).
+- npm (or Yarn) and Watchman (optional on macOS).
+- Xcode 15+ with iOS simulators plus CocoaPods.
+- Android Studio / Android SDK if you plan to test on Android.
+- Access to both backend repos so you can copy `.env` values and spin up the mock APIs.
 
-## Step 1: Start Metro
+# Initial Setup
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+1. Copy the env template and fill in real secrets from the two backend repos:
+	```bash
+	cp .env.example .env
+	```
+2. Install JavaScript dependencies:
+	```bash
+	npm install
+	```
+3. Install CocoaPods (first run or whenever native deps change):
+	```bash
+	cd ios
+	export LANG=en_US.UTF-8 && export LC_ALL=en_US.UTF-8
+	pod install
+	cd ..
+	```
+4. (Optional) Start the mock services:
+	- Scooter mock: `npm install && npm start` (default `http://localhost:3000/api/v1`).
+	- auth-server-service: `npm install && npm run dev` (default `http://localhost:3000`; change `PORT` if it clashes with the mock).
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+# Running the App
 
-```sh
-# Using npm
+## Metro bundler
+
+```bash
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
+Metro listens on port `8081`. If it is taken, run `npm start -- --port=<port>`.
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## iOS (preferred path)
 
-### Android
+```bash
+npm run ios -- --simulator="iPhone 15 Pro"
+```
 
-```sh
-# Using npm
+- If `xcodebuild` exits with 65/70, open `ios/FrontendUserMobile.xcworkspace` in Xcode, pick a valid simulator (for example iOS 17.4), perform a build once, then retry.
+- Missing `.xcconfig`/`.xcfilelist` errors mean Pods were not installed—repeat the CocoaPods step above.
+
+## Android
+
+```bash
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
+- Ensure an emulator is running or a device is attached.
+- Run Gradle sync/install the required SDK platforms inside Android Studio before the first build.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+# Debugging & Tips
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+- Dev Menu: iOS `Cmd + D` (or Device ▸ Shake), Android `Cmd/Ctrl + M` or shake the device.
+- Fast Refresh happens on every file save; use `Cmd + R` (iOS) or double-tap `R` (Android) for a full reload.
+- Logs: `npx react-native log-ios` / `npx react-native log-android`.
+- Health check: `npx react-native doctor` highlights missing dependencies.
+- Metro already running on 8081? Kill the old process via `lsof -i :8081`.
+- Config warnings such as `[config] 环境变量 ... 尚未配置` mean the corresponding key is missing in `.env`.
 
-```sh
-bundle install
-```
+# Next Steps
 
-Then, and every time you update your native dependencies, run:
+- Implement OAuth, rentals, and other business flows under `src/features`.
+- Use the `develop` branch for day-to-day work and open PRs back to `main` once a slice is ready.
 
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+For additional React Native details, see https://reactnative.dev/docs
