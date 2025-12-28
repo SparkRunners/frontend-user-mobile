@@ -63,7 +63,9 @@ const buildOAuthAuthorizeUrl = (provider: OAuthProviderName) => {
     throw new Error(`Unsupported OAuth provider: ${provider}`);
   }
   const trimmedBase = baseUrl.replace(/\/$/, '');
-  return `${trimmedBase}${path}`;
+  const url = `${trimmedBase}${path}`;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}client=mobile`;
 };
 
 const normalizePathname = (value: string) => value.replace(/\/$/, '') || '/';
