@@ -60,7 +60,7 @@ const ScooterPreview = ({
         setState('success');
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : '无法获取踏板车数据',
+          error instanceof Error ? error.message : 'Unable to fetch scooter data',
         );
         setState('error');
       }
@@ -71,16 +71,16 @@ const ScooterPreview = ({
 
   return (
     <View style={[styles.previewSection, { paddingBottom: safeAreaInsets.bottom }] }>
-      <Text style={styles.previewTitle}>踏板车 Mock API 连接状态</Text>
+      <Text style={styles.previewTitle}>Scooter Mock API status</Text>
       <Text style={styles.previewLabel}>
-        当前环境：{runtimeConfig.env} · API：
-        {runtimeConfig.services.scooterApi.baseUrl || '未配置'}
+        Environment: {runtimeConfig.env} | API:
+        {runtimeConfig.services.scooterApi.baseUrl || 'not configured'}
       </Text>
-      {state === 'loading' && <Text style={styles.previewInfo}>正在加载...</Text>}
+      {state === 'loading' && <Text style={styles.previewInfo}>Loading...</Text>}
       {state === 'success' && (
         <Text style={styles.previewInfo}>
-          已获取 {scooters.length} 条车辆记录（示例 ID：
-          {scooters[0]?.id ?? '暂无'}）
+          Retrieved {scooters.length} scooter records (sample ID:
+          {scooters[0]?.id ?? 'N/A'})
         </Text>
       )}
       {state === 'error' && (

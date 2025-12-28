@@ -4,10 +4,8 @@ import {
   AUTH_API_BASE_URL,
   FRONTEND_URL,
   GITHUB_CLIENT_ID,
-  GITHUB_CLIENT_SECRET,
   GITHUB_REDIRECT_URI,
   GOOGLE_CLIENT_ID,
-  GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI,
   SCOOTER_API_BASE_URL,
 } from '@env';
@@ -24,8 +22,7 @@ const coerceEnv = (value?: string): AppEnvironment => {
 
 const ensureValue = (value: string | undefined, label: string) => {
   if (!value && __DEV__) {
-    // eslint-disable-next-line no-console
-    console.warn(`[config] 环境变量 ${label} 尚未配置，相关接口可能无法访问`);
+    console.warn(`[config] Environment variable ${label} is missing; related APIs may be unavailable`);
   }
   return value ?? '';
 };

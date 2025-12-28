@@ -41,8 +41,7 @@ const decodeToken = (token: string): AuthUser | null => {
     };
   } catch (error) {
     if (__DEV__) {
-      // eslint-disable-next-line no-console
-      console.warn('[auth] 无法解析 JWT：', error);
+      console.warn('[auth] Failed to decode JWT:', error);
     }
     return null;
   }
@@ -56,11 +55,11 @@ const providerAuthorizePaths: Record<OAuthProviderName, string> = {
 const buildOAuthAuthorizeUrl = (provider: OAuthProviderName) => {
   const baseUrl = runtimeConfig.services.authApi.baseUrl;
   if (!baseUrl) {
-    throw new Error('AUTH_API_BASE_URL 未配置，无法启动登录流程');
+    throw new Error('AUTH_API_BASE_URL is not configured, cannot start login flow');
   }
   const path = providerAuthorizePaths[provider];
   if (!path) {
-    throw new Error(`不支持的 OAuth Provider: ${provider}`);
+    throw new Error(`Unsupported OAuth provider: ${provider}`);
   }
   const trimmedBase = baseUrl.replace(/\/$/, '');
   return `${trimmedBase}${path}`;
@@ -82,8 +81,7 @@ const isSameDeepLinkTarget = (incomingUrl: string, expectedUrl?: string) => {
     );
   } catch (error) {
     if (__DEV__) {
-      // eslint-disable-next-line no-console
-      console.warn('[auth] deep link 解析失败：', error);
+      console.warn('[auth] Failed to parse deep link:', error);
     }
     return false;
   }
@@ -101,8 +99,7 @@ const parseOAuthDeepLink = (url: string): OAuthDeepLinkResult | null => {
       return { kind: 'success', token };
     } catch (error) {
       if (__DEV__) {
-        // eslint-disable-next-line no-console
-        console.warn('[auth] OAuth 回调解析失败：', error);
+        console.warn('[auth] Failed to parse OAuth callback:', error);
       }
       return null;
     }
@@ -115,8 +112,7 @@ const parseOAuthDeepLink = (url: string): OAuthDeepLinkResult | null => {
       return { kind: 'error', code };
     } catch (error) {
       if (__DEV__) {
-        // eslint-disable-next-line no-console
-        console.warn('[auth] 登录失败回调解析失败：', error);
+        console.warn('[auth] Failed to parse login error callback:', error);
       }
       return null;
     }
@@ -163,7 +159,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         await updateTokenState(null);
         if (!options?.silent) {
-          Toast.show({ type: 'info', text1: '已退出登录' });
+          Toast.show({ type: 'info', text1: 'Signed out' });
         }
       } finally {
         if (isMountedRef.current) {
@@ -189,8 +185,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (result.kind === 'error') {
         Toast.show({
           type: 'error',
-          text1: '登录失败',
-          text2: result.code ? `OAuth 返回错误：${result.code}` : 'OAuth 登录失败',
+          text1: 'Sign-in failed',
+          text2: result.code ? `OAuth error: ${result.code}` : 'OAuth sign-in failed',
         });
         return;
       }
@@ -198,20 +194,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!result.token) {
         Toast.show({
           type: 'error',
-          text1: '登录失败',
-          text2: '未能获取访问令牌',
+          text1: 'Sign-in failed',
+          text2: 'Access token not found',
         });
         return;
       }
 
       try {
         await updateTokenState(result.token);
-        Toast.show({ type: 'success', text1: '登录成功' });
+        Toast.show({ type: 'success', text1: 'Signed in successfully' });
       } catch (error) {
         Toast.show({
           type: 'error',
-          text1: '保存登录状态失败',
-          text2: error instanceof Error ? error.message : '请重试',
+          text1: 'Failed to save session',
+          text2: error instanceof Error ? error.message : 'Please try again',
         });
       }
     },
@@ -232,8 +228,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } catch (error) {
         Toast.show({
           type: 'error',
-          text1: '加载登录状态失败',
-          text2: error instanceof Error ? error.message : '请重试',
+          text1: 'Failed to load saved session',
+          text2: error instanceof Error ? error.message : 'Please try again',
         });
       } finally {
         if (!cancelled) {
@@ -272,8 +268,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setIsAuthorizing(false);
         Toast.show({
           type: 'error',
-          text1: '无法打开登录页面',
-          text2: error instanceof Error ? error.message : '请稍后再试',
+          text1: 'Unable to open login page',
+          text2: error instanceof Error ? error.message : 'Please try again later',
         });
       }
     },
@@ -283,7 +279,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const handler = () => {
       logout({ silent: true }).finally(() => {
-        Toast.show({ type: 'error', text1: '登录状态已过期' });
+        Toast.show({ type: 'error', text1: 'Session expired' });
       });
     };
     registerUnauthorizedHandler(handler);
@@ -309,7 +305,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth 必须在 <AuthProvider /> 内使用');
+    throw new Error('useAuth must be used within <AuthProvider />');
   }
   return context;
 };

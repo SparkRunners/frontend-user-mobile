@@ -26,7 +26,7 @@ const createHttpClient = (
   timeoutMs = 15_000,
 ): AxiosInstance => {
   if (!baseURL) {
-    throw new Error('缺少 baseURL，无法创建 Axios 实例');
+    throw new Error('Missing baseURL. Unable to create Axios instance');
   }
 
   const instance = axios.create({

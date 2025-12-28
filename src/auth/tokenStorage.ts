@@ -16,7 +16,7 @@ export const tokenStorage = {
   async clear() {
     try {
       await Keychain.resetGenericPassword({ service: SERVICE });
-    } catch (error) {
+    } catch {
       // Ignore missing entries
     }
   },
