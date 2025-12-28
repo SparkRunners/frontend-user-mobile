@@ -31,6 +31,11 @@ const trimTrailingSlash = (value: string) => value.replace(/\/$/, '');
 
 const resolvedEnv = coerceEnv(APP_ENV);
 
+const frontendBaseUrl = (() => {
+  const url = ensureValue(FRONTEND_URL, 'FRONTEND_URL');
+  return url ? trimTrailingSlash(url) : '';
+})();
+
 export const runtimeConfig: RuntimeConfig = {
   env: resolvedEnv,
   services: {
@@ -44,10 +49,10 @@ export const runtimeConfig: RuntimeConfig = {
     },
   },
   oauth: {
-    frontendRedirectUrl: (() => {
-      const url = ensureValue(FRONTEND_URL, 'FRONTEND_URL');
-      return url ? `${trimTrailingSlash(url)}/oauth-callback` : '';
-    })(),
+    frontendRedirectUrl: frontendBaseUrl
+      ? `${frontendBaseUrl}/oauth-callback`
+      : '',
+    frontendLoginUrl: frontendBaseUrl ? `${frontendBaseUrl}/login` : '',
     google: {
       clientId: ensureValue(GOOGLE_CLIENT_ID, 'GOOGLE_CLIENT_ID'),
       redirectUri: ensureValue(GOOGLE_REDIRECT_URI, 'GOOGLE_REDIRECT_URI'),
