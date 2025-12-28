@@ -1,5 +1,3 @@
 <resources>
-    <string name="app_name">FrontendUserMobile</string>
-    <string name="app_auth_scheme">sparkapp</string>
-    <string name="app_auth_host">app</string>
+    <string name="app_name">SparkRunner</string>
 </resources>

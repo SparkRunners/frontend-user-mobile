@@ -32,8 +32,8 @@ const trimTrailingSlash = (value: string) => value.replace(/\/$/, '');
 const resolvedEnv = coerceEnv(APP_ENV);
 
 const frontendBaseUrl = (() => {
-  const value = ensureValue(FRONTEND_URL, 'FRONTEND_URL');
-  return value ? trimTrailingSlash(value) : '';
+  const url = ensureValue(FRONTEND_URL, 'FRONTEND_URL');
+  return url ? trimTrailingSlash(url) : '';
 })();
 
 export const runtimeConfig: RuntimeConfig = {

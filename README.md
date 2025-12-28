@@ -70,5 +70,6 @@ npm run android
 
 - Implement OAuth, rentals, and other business flows under `src/features`.
 - Use the `develop` branch for day-to-day work and open PRs back to `main` once a slice is ready.
+- Keep UI consistent by reusing the tokens in `src/theme` (see `docs/design-tokens.md`) before adding new components.
 
 For additional React Native details, see https://reactnative.dev/docs

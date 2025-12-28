@@ -7,14 +7,14 @@ export interface AuthUser {
   username?: string;
   email?: string;
   role?: string;
-  issuedAt?: number;
-  expiresAt?: number;
-  payload?: AuthJwtPayload;
 }
 
-export interface AuthJwtPayload extends JwtPayload {
+export interface AuthUser {
   id?: string;
   username?: string;
   email?: string;
   role?: string;
+  issuedAt?: number;
+  expiresAt?: number;
+  payload?: AuthJwtPayload;
 }

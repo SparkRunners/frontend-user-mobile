@@ -12,17 +12,25 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
+import { AuthGate, AuthProvider } from './src/auth';
 import { fetchScooters, type Scooter } from './src/features/scooters/api';
 import { runtimeConfig } from './src/config';
+import { theme } from './src/theme';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
+    <AuthProvider>
+      <SafeAreaProvider>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <AuthGate>
+          <AppContent />
+        </AuthGate>
+        <Toast />
+      </SafeAreaProvider>
+    </AuthProvider>
   );
 }
 
@@ -93,27 +101,28 @@ const ScooterPreview = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: theme.colors.background,
   },
   previewSection: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    gap: 8,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.xl,
+    gap: theme.spacing.sm,
   },
   previewTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...theme.typography.titleM,
+    color: theme.colors.text,
   },
   previewLabel: {
-    fontSize: 14,
-    color: '#555',
+    ...theme.typography.bodyS,
+    color: theme.colors.textMuted,
   },
   previewInfo: {
-    fontSize: 14,
-    color: '#0a7cff',
+    ...theme.typography.bodyS,
+    color: theme.colors.info,
   },
   previewError: {
-    fontSize: 14,
-    color: '#d64545',
+    ...theme.typography.bodyS,
+    color: theme.colors.danger,
   },
 });
 

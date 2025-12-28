@@ -50,6 +50,7 @@ const decodeToken = (token: string): AuthUser | null => {
 const providerAuthorizePaths: Record<OAuthProviderName, string> = {
   google: '/auth/google',
   github: '/auth/github',
+  apple: '/auth/apple',
 };
 
 const buildOAuthAuthorizeUrl = (provider: OAuthProviderName) => {
