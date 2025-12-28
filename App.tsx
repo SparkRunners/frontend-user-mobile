@@ -12,6 +12,8 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
+import { AuthGate, AuthProvider } from './src/auth';
 import { fetchScooters, type Scooter } from './src/features/scooters/api';
 import { runtimeConfig } from './src/config';
 import { theme } from './src/theme';
@@ -20,10 +22,15 @@ function App() {
   const isDarkMode = useColorScheme() === 'dark';
 
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
+    <AuthProvider>
+      <SafeAreaProvider>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <AuthGate>
+          <AppContent />
+        </AuthGate>
+        <Toast />
+      </SafeAreaProvider>
+    </AuthProvider>
   );
 }
 

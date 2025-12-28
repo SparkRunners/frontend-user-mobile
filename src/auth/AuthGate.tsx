@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { useAuth } from './AuthProvider';
 import { theme } from '../theme';
 import type { OAuthProviderName } from './types';
@@ -26,30 +27,27 @@ interface LoginOption {
 const LOGIN_OPTIONS: LoginOption[] = [
   {
     provider: 'google',
-    label: 'Logga in med Google',
-    subtitle: 'Koppla ditt Google-konto',
+    label: 'Fortsätt med Google',
+    subtitle: 'Använd ditt Google-konto',
     variant: 'light',
     icon: 'G',
   },
   {
     provider: 'github',
-    label: 'Logga in med GitHub',
-    subtitle: 'Använd ditt utvecklarkonto',
+    label: 'Fortsätt med GitHub',
+    subtitle: 'Använd ditt GitHub-konto',
     variant: 'dark',
     icon: 'GH',
-  },
-  {
-    provider: 'apple',
-    label: 'Logga in med Apple',
-    subtitle: 'Krav från App Store',
-    variant: 'dark',
-    icon: '',
   },
 ];
 
 export const AuthGate = ({ children }: AuthGateProps) => {
   const { isReady, isAuthenticated, isAuthorizing, user, login, logout } = useAuth();
   const insets = useSafeAreaInsets();
+
+  const handleGuestAccess = () => {
+    Toast.show({ type: 'info', text1: 'Gästläge kommer snart' });
+  };
 
   if (!isReady) {
     return (
@@ -63,13 +61,13 @@ export const AuthGate = ({ children }: AuthGateProps) => {
   if (!isAuthenticated) {
     return (
       <View style={[styles.unauthenticatedWrapper, { paddingBottom: insets.bottom + theme.spacing.xl }] }>
-        <View style={styles.heroCard}>
-          <Text style={styles.heroLabel}>Logga in</Text>
-          <Text style={styles.heroTitle}>Välkommen tillbaka 🌱</Text>
-          <Text style={styles.heroSubtitle}>
-            Välj ett konto för att fortsätta. Du kan alltid ändra det senare i profilinställningarna.
-          </Text>
+        <View style={styles.heroIconContainer}>
+          <View style={styles.heroIconBackdrop}>
+            <Text style={styles.heroIconGlyph}>🛴</Text>
+          </View>
         </View>
+        <Text style={styles.heroTitle}>Välkommen</Text>
+        <Text style={styles.heroSubtitle}>Logga in för att fortsätta</Text>
         <View style={styles.loginCard}>
           {LOGIN_OPTIONS.map(option => (
             <LoginButton
@@ -86,6 +84,9 @@ export const AuthGate = ({ children }: AuthGateProps) => {
             </View>
           )}
         </View>
+        <TouchableOpacity onPress={handleGuestAccess} style={styles.skipLink}>
+          <Text style={styles.skipLinkLabel}>Fortsätt utan konto</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -156,29 +157,39 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
     paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.xl,
-    gap: theme.spacing.lg,
+    paddingTop: theme.spacing.xxl,
+    gap: theme.spacing.md,
+    alignItems: 'center',
   },
-  heroCard: {
-    backgroundColor: theme.colors.brandMuted,
+  heroIconContainer: {
+    width: 88,
+    height: 88,
     borderRadius: theme.radii.card,
-    padding: theme.spacing.xl,
+    backgroundColor: theme.colors.card,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...theme.shadows.soft,
   },
-  heroLabel: {
-    ...theme.typography.caption,
-    color: theme.colors.brand,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  heroIconBackdrop: {
+    width: 72,
+    height: 72,
+    borderRadius: theme.radii.card,
+    backgroundColor: theme.colors.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroIconGlyph: {
+    fontSize: 32,
   },
   heroTitle: {
     ...theme.typography.titleL,
     color: theme.colors.text,
-    marginTop: theme.spacing.sm,
+    textAlign: 'center',
   },
   heroSubtitle: {
     ...theme.typography.bodyS,
     color: theme.colors.textMuted,
-    marginTop: theme.spacing.sm,
+    textAlign: 'center',
   },
   loginCard: {
     backgroundColor: theme.colors.card,
@@ -186,6 +197,7 @@ const styles = StyleSheet.create({
     padding: theme.spacing.lg,
     gap: theme.spacing.md,
     ...theme.shadows.soft,
+    width: '100%',
   },
   loginButton: {
     flexDirection: 'row',
@@ -256,6 +268,14 @@ const styles = StyleSheet.create({
   authorizingLabel: {
     ...theme.typography.bodyS,
     color: theme.colors.brand,
+  },
+  skipLink: {
+    marginTop: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+  },
+  skipLinkLabel: {
+    ...theme.typography.bodyS,
+    color: theme.colors.textMuted,
   },
   authenticatedWrapper: {
     flex: 1,
