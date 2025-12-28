@@ -12,6 +12,7 @@ export interface OAuthProviderConfig {
 
 export interface OAuthConfig {
   frontendRedirectUrl: string;
+  frontendLoginUrl: string;
   google: OAuthProviderConfig;
   github: OAuthProviderConfig;
 }
