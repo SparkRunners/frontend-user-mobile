@@ -11,10 +11,13 @@
   },
   "dependencies": {
     "axios": "^1.7.7",
+    "jwt-decode": "^4.0.0",
     "react": "19.2.0",
     "react-native": "0.83.1",
     "@react-native/new-app-screen": "0.83.1",
-    "react-native-safe-area-context": "^5.5.2"
+    "react-native-keychain": "^10.0.0",
+    "react-native-safe-area-context": "^5.5.2",
+    "react-native-toast-message": "^2.3.3"
   },
   "devDependencies": {
     "babel-plugin-dotenv-import": "^3.0.1",

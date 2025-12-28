@@ -3,6 +3,15 @@ import { runtimeConfig } from '../config';
 
 let accessToken: string | null = null;
 
+type UnauthorizedHandler = (error?: unknown) => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export const registerUnauthorizedHandler = (
+  handler: UnauthorizedHandler | null,
+) => {
+  unauthorizedHandler = handler;
+};
+
 export const authTokenStore = {
   set(token: string | null) {
     accessToken = token;
@@ -35,6 +44,16 @@ const createHttpClient = (
     }
     return config;
   });
+
+  instance.interceptors.response.use(
+    response => response,
+    error => {
+      if (error?.response?.status === 401 && unauthorizedHandler) {
+        unauthorizedHandler(error);
+      }
+      return Promise.reject(error);
+    },
+  );
 
   return instance;
 };
