@@ -64,11 +64,12 @@ npm run android
 - Logs: `npx react-native log-ios` / `npx react-native log-android`.
 - Health check: `npx react-native doctor` highlights missing dependencies.
 - Metro already running on 8081? Kill the old process via `lsof -i :8081`.
-- Config warnings such as `[config] 环境变量 ... 尚未配置` mean the corresponding key is missing in `.env`.
+- Config warnings such as `[config] Environment variable ... is missing` mean the corresponding key is missing in `.env`.
 
 # Next Steps
 
 - Implement OAuth, rentals, and other business flows under `src/features`.
 - Use the `develop` branch for day-to-day work and open PRs back to `main` once a slice is ready.
+- Keep UI consistent by reusing the tokens in `src/theme` (see `docs/design-tokens.md`) before adding new components.
 
 For additional React Native details, see https://reactnative.dev/docs
