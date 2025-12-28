@@ -2,7 +2,7 @@ This repository hosts the SparkRunner user app built with React Native CLI. It i
 
 # Requirements
 
-- Node.js ≥ 20 (nvm recommended for version switching).
+- Node.js >= 20 (nvm recommended for version switching).
 - npm (or Yarn) and Watchman (optional on macOS).
 - Xcode 15+ with iOS simulators plus CocoaPods.
 - Android Studio / Android SDK if you plan to test on Android.
@@ -46,7 +46,7 @@ npm run ios -- --simulator="iPhone 15 Pro"
 ```
 
 - If `xcodebuild` exits with 65/70, open `ios/FrontendUserMobile.xcworkspace` in Xcode, pick a valid simulator (for example iOS 17.4), perform a build once, then retry.
-- Missing `.xcconfig`/`.xcfilelist` errors mean Pods were not installed—repeat the CocoaPods step above.
+- Missing `.xcconfig`/`.xcfilelist` errors mean Pods were not installed - repeat the CocoaPods step above.
 
 ## Android
 
@@ -59,7 +59,7 @@ npm run android
 
 # Debugging & Tips
 
-- Dev Menu: iOS `Cmd + D` (or Device ▸ Shake), Android `Cmd/Ctrl + M` or shake the device.
+- Dev Menu: iOS `Cmd + D` (or Device > Shake), Android `Cmd/Ctrl + M` or shake the device.
 - Fast Refresh happens on every file save; use `Cmd + R` (iOS) or double-tap `R` (Android) for a full reload.
 - Logs: `npx react-native log-ios` / `npx react-native log-android`.
 - Health check: `npx react-native doctor` highlights missing dependencies.
