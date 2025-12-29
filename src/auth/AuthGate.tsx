@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { useAuth } from './AuthProvider';
+import { loginWithEmail, registerWithEmail } from './api';
 import { theme } from '../theme';
 import type { OAuthProviderName } from './types';
 
@@ -65,7 +66,15 @@ const EMAIL_FORM_INITIAL_STATE = {
 type EmailFormState = typeof EMAIL_FORM_INITIAL_STATE;
 
 export const AuthGate = ({ children }: AuthGateProps) => {
-  const { isReady, isAuthenticated, isAuthorizing, user, login, logout } = useAuth();
+  const {
+    isReady,
+    isAuthenticated,
+    isAuthorizing,
+    user,
+    login,
+    logout,
+    authenticateWithToken,
+  } = useAuth();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<AuthTab>('oauth');
   const [emailMode, setEmailMode] = useState<EmailMode>('login');
@@ -77,6 +86,7 @@ export const AuthGate = ({ children }: AuthGateProps) => {
     confirmPassword: false,
   });
   const [emailSubmitted, setEmailSubmitted] = useState(false);
+  const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
 
   const emailErrors = useMemo(() => {
     const errors: Partial<EmailFormState> = {};
@@ -116,17 +126,50 @@ export const AuthGate = ({ children }: AuthGateProps) => {
     setTouchedFields(prev => ({ ...prev, [field]: true }));
   };
 
-  const handleEmailSubmit = () => {
+  const handleEmailSubmit = async () => {
     setEmailSubmitted(true);
-    if (!isEmailFormValid) {
-      Toast.show({ type: 'error', text1: 'Kolla fälten igen' });
+    if (!isEmailFormValid || isEmailSubmitting) {
+      if (!isEmailFormValid) {
+        Toast.show({ type: 'error', text1: 'Kolla fälten igen' });
+      }
       return;
     }
-    Toast.show({
-      type: 'info',
-      text1: emailMode === 'login' ? 'E-postinloggning kommer snart' : 'Registrering kommer snart',
-      text2: 'REST-koppling läggs till i nästa steg',
-    });
+
+    setIsEmailSubmitting(true);
+    const currentMode = emailMode;
+    const trimmedEmail = emailForm.email.trim();
+    const password = emailForm.password;
+    let registerCompleted = false;
+
+    try {
+      if (currentMode === 'register') {
+        await registerWithEmail({
+          username: emailForm.username.trim(),
+          email: trimmedEmail,
+          password,
+        });
+        registerCompleted = true;
+        Toast.show({ type: 'success', text1: 'Kontot skapades', text2: 'Loggar in...' });
+      }
+
+      const { token } = await loginWithEmail({ email: trimmedEmail, password });
+      await authenticateWithToken(token);
+      Toast.show({ type: 'success', text1: 'Inloggad', text2: 'Du är redo att köra!' });
+    } catch (error) {
+      const text1 =
+        currentMode === 'register'
+          ? registerCompleted
+            ? 'Inloggningen misslyckades'
+            : 'Registreringen misslyckades'
+          : 'Inloggningen misslyckades';
+      Toast.show({
+        type: 'error',
+        text1,
+        text2: error instanceof Error ? error.message : 'Försök igen senare',
+      });
+    } finally {
+      setIsEmailSubmitting(false);
+    }
   };
 
   const handleGuestAccess = () => {
@@ -276,13 +319,20 @@ export const AuthGate = ({ children }: AuthGateProps) => {
               </View>
             )}
             <TouchableOpacity
-              style={[styles.submitButton, !isEmailFormValid && styles.submitButtonDisabled]}
+              style={[
+                styles.submitButton,
+                (!isEmailFormValid || isEmailSubmitting) && styles.submitButtonDisabled,
+              ]}
               onPress={handleEmailSubmit}
-              disabled={!isEmailFormValid}
+              disabled={!isEmailFormValid || isEmailSubmitting}
             >
-              <Text style={styles.submitButtonLabel}>
-                {emailMode === 'login' ? 'Logga in' : 'Skapa konto'}
-              </Text>
+              {isEmailSubmitting ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={styles.submitButtonLabel}>
+                  {emailMode === 'login' ? 'Logga in' : 'Skapa konto'}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         )}
