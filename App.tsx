@@ -12,25 +12,17 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import Toast from 'react-native-toast-message';
-import { AuthGate, AuthProvider } from './src/auth';
 import { fetchScooters, type Scooter } from './src/features/scooters/api';
 import { runtimeConfig } from './src/config';
-import { theme } from './src/theme';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
 
   return (
-    <AuthProvider>
-      <SafeAreaProvider>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-        <AuthGate>
-          <AppContent />
-        </AuthGate>
-        <Toast />
-      </SafeAreaProvider>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+      <AppContent />
+    </SafeAreaProvider>
   );
 }
 
@@ -68,7 +60,7 @@ const ScooterPreview = ({
         setState('success');
       } catch (error) {
         setErrorMessage(
-          error instanceof Error ? error.message : 'Unable to fetch scooter data',
+          error instanceof Error ? error.message : '无法获取踏板车数据',
         );
         setState('error');
       }
@@ -79,16 +71,16 @@ const ScooterPreview = ({
 
   return (
     <View style={[styles.previewSection, { paddingBottom: safeAreaInsets.bottom }] }>
-      <Text style={styles.previewTitle}>Scooter Mock API status</Text>
+      <Text style={styles.previewTitle}>踏板车 Mock API 连接状态</Text>
       <Text style={styles.previewLabel}>
-        Environment: {runtimeConfig.env} | API:
-        {runtimeConfig.services.scooterApi.baseUrl || 'not configured'}
+        当前环境：{runtimeConfig.env} · API：
+        {runtimeConfig.services.scooterApi.baseUrl || '未配置'}
       </Text>
-      {state === 'loading' && <Text style={styles.previewInfo}>Loading...</Text>}
+      {state === 'loading' && <Text style={styles.previewInfo}>正在加载...</Text>}
       {state === 'success' && (
         <Text style={styles.previewInfo}>
-          Retrieved {scooters.length} scooter records (sample ID:
-          {scooters[0]?.id ?? 'N/A'})
+          已获取 {scooters.length} 条车辆记录（示例 ID：
+          {scooters[0]?.id ?? '暂无'}）
         </Text>
       )}
       {state === 'error' && (
@@ -101,28 +93,27 @@ const ScooterPreview = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
   },
   previewSection: {
-    paddingHorizontal: theme.spacing.xl,
-    paddingTop: theme.spacing.xl,
-    gap: theme.spacing.sm,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    gap: 8,
   },
   previewTitle: {
-    ...theme.typography.titleM,
-    color: theme.colors.text,
+    fontSize: 16,
+    fontWeight: '600',
   },
   previewLabel: {
-    ...theme.typography.bodyS,
-    color: theme.colors.textMuted,
+    fontSize: 14,
+    color: '#555',
   },
   previewInfo: {
-    ...theme.typography.bodyS,
-    color: theme.colors.info,
+    fontSize: 14,
+    color: '#0a7cff',
   },
   previewError: {
-    ...theme.typography.bodyS,
-    color: theme.colors.danger,
+    fontSize: 14,
+    color: '#d64545',
   },
 });
 
