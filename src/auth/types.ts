@@ -2,7 +2,7 @@ import type { JwtPayload } from 'jwt-decode';
 
 export type OAuthProviderName = 'google' | 'github';
 
-export interface AuthUser {
+export interface AuthJwtPayload extends JwtPayload {
   id?: string;
   username?: string;
   email?: string;

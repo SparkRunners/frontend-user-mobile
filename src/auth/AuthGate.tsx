@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   TextInput,
@@ -87,6 +87,19 @@ export const AuthGate = ({ children }: AuthGateProps) => {
   });
   const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setEmailForm(EMAIL_FORM_INITIAL_STATE);
+      setTouchedFields({
+        username: false,
+        email: false,
+        password: false,
+        confirmPassword: false,
+      });
+      setEmailSubmitted(false);
+    }
+  }, [isAuthenticated]);
 
   const emailErrors = useMemo(() => {
     const errors: Partial<EmailFormState> = {};
