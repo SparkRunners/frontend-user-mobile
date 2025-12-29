@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { Linking } from 'react-native';
-import jwtDecode from 'jwt-decode';
+import { jwtDecode } from 'jwt-decode';
 import Toast from 'react-native-toast-message';
 import { runtimeConfig } from '../config';
 import { authTokenStore, registerUnauthorizedHandler } from '../api/httpClient';
@@ -22,6 +22,7 @@ interface AuthContextValue {
   isAuthorizing: boolean;
   isAuthenticated: boolean;
   login: (provider: OAuthProviderName) => Promise<void>;
+  authenticateWithToken: (token: string, options?: { persist?: boolean; userOverride?: Partial<AuthUser> }) => Promise<void>;
   logout: (options?: { silent?: boolean }) => Promise<void>;
 }
 
@@ -173,6 +174,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     [updateTokenState],
   );
 
+  const authenticateWithToken = useCallback(
+    async (nextToken: string, options?: { persist?: boolean }) => {
+      await updateTokenState(nextToken, options);
+    },
+    [updateTokenState],
+  );
+
   const handleDeepLink = useCallback(
     async (url?: string | null) => {
       if (!url || lastHandledUrlRef.current === url) {
@@ -297,9 +305,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       isAuthorizing,
       isAuthenticated: Boolean(token),
       login,
+      authenticateWithToken,
       logout,
     }),
-    [token, user, isReady, isAuthorizing, login, logout],
+    [token, user, isReady, isAuthorizing, login, authenticateWithToken, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  TextInput,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -9,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { useAuth } from './AuthProvider';
+import { loginWithEmail, registerWithEmail } from './api';
 import { theme } from '../theme';
 import type { OAuthProviderName } from './types';
 
@@ -41,9 +43,147 @@ const LOGIN_OPTIONS: LoginOption[] = [
   },
 ];
 
+type AuthTab = 'oauth' | 'email';
+type EmailMode = 'login' | 'register';
+
+const AUTH_TABS: Array<{ key: AuthTab; label: string }> = [
+  { key: 'oauth', label: 'Socialt' },
+  { key: 'email', label: 'E-post' },
+];
+
+const EMAIL_MODE_TABS: Array<{ key: EmailMode; label: string }> = [
+  { key: 'login', label: 'Logga in' },
+  { key: 'register', label: 'Skapa konto' },
+];
+
+const EMAIL_FORM_INITIAL_STATE = {
+  username: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+};
+
+type EmailFormState = typeof EMAIL_FORM_INITIAL_STATE;
+
 export const AuthGate = ({ children }: AuthGateProps) => {
-  const { isReady, isAuthenticated, isAuthorizing, user, login, logout } = useAuth();
+  const {
+    isReady,
+    isAuthenticated,
+    isAuthorizing,
+    user,
+    login,
+    logout,
+    authenticateWithToken,
+  } = useAuth();
   const insets = useSafeAreaInsets();
+  const [activeTab, setActiveTab] = useState<AuthTab>('oauth');
+  const [emailMode, setEmailMode] = useState<EmailMode>('login');
+  const [emailForm, setEmailForm] = useState<EmailFormState>(EMAIL_FORM_INITIAL_STATE);
+  const [touchedFields, setTouchedFields] = useState<Record<keyof EmailFormState, boolean>>({
+    username: false,
+    email: false,
+    password: false,
+    confirmPassword: false,
+  });
+  const [emailSubmitted, setEmailSubmitted] = useState(false);
+  const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setEmailForm(EMAIL_FORM_INITIAL_STATE);
+      setTouchedFields({
+        username: false,
+        email: false,
+        password: false,
+        confirmPassword: false,
+      });
+      setEmailSubmitted(false);
+    }
+  }, [isAuthenticated]);
+
+  const emailErrors = useMemo(() => {
+    const errors: Partial<EmailFormState> = {};
+    const trimmedEmail = emailForm.email.trim();
+    if (!trimmedEmail || !/^[^@]+@[^@]+\.[^@]+$/.test(trimmedEmail)) {
+      errors.email = 'Ogiltig e-postadress';
+    }
+    if (!emailForm.password || emailForm.password.length < 8) {
+      errors.password = 'Minst 8 tecken';
+    }
+    if (emailMode === 'register') {
+      if (!emailForm.username.trim()) {
+        errors.username = 'Ange ett namn';
+      }
+      if (!emailForm.confirmPassword) {
+        errors.confirmPassword = 'Bekräfta lösenordet';
+      } else if (emailForm.confirmPassword !== emailForm.password) {
+        errors.confirmPassword = 'Lösenorden matchar inte';
+      }
+    }
+    return errors;
+  }, [emailForm, emailMode]);
+
+  const isEmailFormValid = useMemo(
+    () => Object.keys(emailErrors).length === 0,
+    [emailErrors],
+  );
+
+  const shouldShowError = (field: keyof EmailFormState) =>
+    Boolean(emailErrors[field]) && (touchedFields[field] || emailSubmitted);
+
+  const handleFieldChange = (field: keyof EmailFormState, value: string) => {
+    setEmailForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleFieldBlur = (field: keyof EmailFormState) => {
+    setTouchedFields(prev => ({ ...prev, [field]: true }));
+  };
+
+  const handleEmailSubmit = async () => {
+    setEmailSubmitted(true);
+    if (!isEmailFormValid || isEmailSubmitting) {
+      if (!isEmailFormValid) {
+        Toast.show({ type: 'error', text1: 'Kolla fälten igen' });
+      }
+      return;
+    }
+
+    setIsEmailSubmitting(true);
+    const currentMode = emailMode;
+    const trimmedEmail = emailForm.email.trim();
+    const password = emailForm.password;
+    let registerCompleted = false;
+
+    try {
+      if (currentMode === 'register') {
+        await registerWithEmail({
+          username: emailForm.username.trim(),
+          email: trimmedEmail,
+          password,
+        });
+        registerCompleted = true;
+        Toast.show({ type: 'success', text1: 'Kontot skapades', text2: 'Loggar in...' });
+      }
+
+      const { token } = await loginWithEmail({ email: trimmedEmail, password });
+      await authenticateWithToken(token);
+      Toast.show({ type: 'success', text1: 'Inloggad', text2: 'Du är redo att köra!' });
+    } catch (error) {
+      const text1 =
+        currentMode === 'register'
+          ? registerCompleted
+            ? 'Inloggningen misslyckades'
+            : 'Registreringen misslyckades'
+          : 'Inloggningen misslyckades';
+      Toast.show({
+        type: 'error',
+        text1,
+        text2: error instanceof Error ? error.message : 'Försök igen senare',
+      });
+    } finally {
+      setIsEmailSubmitting(false);
+    }
+  };
 
   const handleGuestAccess = () => {
     Toast.show({ type: 'info', text1: 'Gästläge kommer snart' });
@@ -68,22 +208,147 @@ export const AuthGate = ({ children }: AuthGateProps) => {
         </View>
         <Text style={styles.heroTitle}>Välkommen</Text>
         <Text style={styles.heroSubtitle}>Logga in för att fortsätta</Text>
-        <View style={styles.loginCard}>
-          {LOGIN_OPTIONS.map(option => (
-            <LoginButton
-              key={option.provider}
-              option={option}
-              disabled={isAuthorizing}
-              onPress={() => login(option.provider)}
-            />
+        <View style={styles.tabGroup}>
+          {AUTH_TABS.map(tab => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tabButton, activeTab === tab.key && styles.tabButtonActive]}
+              onPress={() => setActiveTab(tab.key)}
+            >
+              <Text
+                style={[styles.tabButtonLabel, activeTab === tab.key && styles.tabButtonLabelActive]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
           ))}
-          {isAuthorizing && (
-            <View style={styles.authorizingBanner}>
-              <ActivityIndicator color={theme.colors.brand} size="small" />
-              <Text style={styles.authorizingLabel}>Fortsätt i webbläsaren för att slutföra inloggningen...</Text>
-            </View>
-          )}
         </View>
+        {activeTab === 'oauth' ? (
+          <View style={styles.loginCard}>
+            {LOGIN_OPTIONS.map(option => (
+              <LoginButton
+                key={option.provider}
+                option={option}
+                disabled={isAuthorizing}
+                onPress={() => login(option.provider)}
+              />
+            ))}
+            {isAuthorizing && (
+              <View style={styles.authorizingBanner}>
+                <ActivityIndicator color={theme.colors.brand} size="small" />
+                <Text style={styles.authorizingLabel}>Fortsätt i webbläsaren för att slutföra inloggningen...</Text>
+              </View>
+            )}
+          </View>
+        ) : (
+          <View style={styles.loginCard}>
+            <View style={styles.modeSwitcher}>
+              {EMAIL_MODE_TABS.map(mode => (
+                <TouchableOpacity
+                  key={mode.key}
+                  style={[styles.modeButton, emailMode === mode.key && styles.modeButtonActive]}
+                  onPress={() => {
+                    setEmailMode(mode.key);
+                    setEmailSubmitted(false);
+                  }}
+                >
+                  <Text
+                    style={[styles.modeButtonLabel, emailMode === mode.key && styles.modeButtonLabelActive]}
+                  >
+                    {mode.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {emailMode === 'register' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>För- och efternamn</Text>
+                <TextInput
+                  value={emailForm.username}
+                  onChangeText={value => handleFieldChange('username', value)}
+                  onBlur={() => handleFieldBlur('username')}
+                  placeholder="Spark Rider"
+                  placeholderTextColor={theme.colors.textMuted}
+                  style={[styles.inputField, shouldShowError('username') && styles.inputFieldError]}
+                  textContentType="name"
+                  autoCapitalize="words"
+                />
+                {shouldShowError('username') && (
+                  <Text style={styles.inputErrorText}>{emailErrors.username}</Text>
+                )}
+              </View>
+            )}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>E-post</Text>
+              <TextInput
+                value={emailForm.email}
+                onChangeText={value => handleFieldChange('email', value)}
+                onBlur={() => handleFieldBlur('email')}
+                placeholder="din@epost.se"
+                placeholderTextColor={theme.colors.textMuted}
+                style={[styles.inputField, shouldShowError('email') && styles.inputFieldError]}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                textContentType="emailAddress"
+              />
+              {shouldShowError('email') && (
+                <Text style={styles.inputErrorText}>{emailErrors.email}</Text>
+              )}
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Lösenord</Text>
+              <TextInput
+                value={emailForm.password}
+                onChangeText={value => handleFieldChange('password', value)}
+                onBlur={() => handleFieldBlur('password')}
+                placeholder="Minst 8 tecken"
+                placeholderTextColor={theme.colors.textMuted}
+                style={[styles.inputField, shouldShowError('password') && styles.inputFieldError]}
+                secureTextEntry
+                autoCapitalize="none"
+                textContentType={emailMode === 'login' ? 'password' : 'newPassword'}
+              />
+              {shouldShowError('password') && (
+                <Text style={styles.inputErrorText}>{emailErrors.password}</Text>
+              )}
+            </View>
+            {emailMode === 'register' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Bekräfta lösenord</Text>
+                <TextInput
+                  value={emailForm.confirmPassword}
+                  onChangeText={value => handleFieldChange('confirmPassword', value)}
+                  onBlur={() => handleFieldBlur('confirmPassword')}
+                  placeholder="Upprepa lösenordet"
+                  placeholderTextColor={theme.colors.textMuted}
+                  style={[styles.inputField, shouldShowError('confirmPassword') && styles.inputFieldError]}
+                  secureTextEntry
+                  autoCapitalize="none"
+                  textContentType="newPassword"
+                />
+                {shouldShowError('confirmPassword') && (
+                  <Text style={styles.inputErrorText}>{emailErrors.confirmPassword}</Text>
+                )}
+              </View>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                (!isEmailFormValid || isEmailSubmitting) && styles.submitButtonDisabled,
+              ]}
+              onPress={handleEmailSubmit}
+              disabled={!isEmailFormValid || isEmailSubmitting}
+            >
+              {isEmailSubmitting ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text style={styles.submitButtonLabel}>
+                  {emailMode === 'login' ? 'Logga in' : 'Skapa konto'}
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
         <TouchableOpacity onPress={handleGuestAccess} style={styles.skipLink}>
           <Text style={styles.skipLinkLabel}>Fortsätt utan konto</Text>
         </TouchableOpacity>
@@ -191,6 +456,31 @@ const styles = StyleSheet.create({
     color: theme.colors.textMuted,
     textAlign: 'center',
   },
+  tabGroup: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radii.control,
+    padding: theme.spacing.xs,
+    gap: theme.spacing.xs,
+    width: '100%',
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radii.control,
+    alignItems: 'center',
+  },
+  tabButtonActive: {
+    backgroundColor: theme.colors.brandMuted,
+  },
+  tabButtonLabel: {
+    ...theme.typography.bodyS,
+    color: theme.colors.textMuted,
+  },
+  tabButtonLabelActive: {
+    color: theme.colors.brand,
+    fontWeight: '600',
+  },
   loginCard: {
     backgroundColor: theme.colors.card,
     borderRadius: theme.radii.card,
@@ -268,6 +558,71 @@ const styles = StyleSheet.create({
   authorizingLabel: {
     ...theme.typography.bodyS,
     color: theme.colors.brand,
+  },
+  modeSwitcher: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.background,
+    borderRadius: theme.radii.control,
+    padding: 4,
+    gap: 4,
+  },
+  modeButton: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radii.control,
+    alignItems: 'center',
+  },
+  modeButtonActive: {
+    backgroundColor: theme.colors.brandMuted,
+  },
+  modeButtonLabel: {
+    ...theme.typography.bodyS,
+    color: theme.colors.textMuted,
+  },
+  modeButtonLabelActive: {
+    color: theme.colors.brand,
+    fontWeight: '600',
+  },
+  inputGroup: {
+    width: '100%',
+    gap: 4,
+  },
+  inputLabel: {
+    ...theme.typography.caption,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: theme.colors.textMuted,
+  },
+  inputField: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radii.control,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    color: theme.colors.text,
+    ...theme.typography.bodyS,
+  },
+  inputFieldError: {
+    borderColor: theme.colors.danger,
+  },
+  inputErrorText: {
+    ...theme.typography.caption,
+    color: theme.colors.danger,
+  },
+  submitButton: {
+    marginTop: theme.spacing.sm,
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.radii.control,
+    backgroundColor: theme.colors.brand,
+    alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    backgroundColor: theme.colors.iconDisabled,
+  },
+  submitButtonLabel: {
+    ...theme.typography.bodyM,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   skipLink: {
     marginTop: theme.spacing.md,
