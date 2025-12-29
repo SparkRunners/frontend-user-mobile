@@ -1,18 +1,18 @@
 import { scooterApiClient } from '../../api/httpClient';
 
-export interface ScooterLocation {
+export interface ScooterCoordinates {
   latitude: number;
   longitude: number;
 }
 
 export interface Scooter {
-  id: string;
-  label?: string;
-  city?: string;
+  id: number;
+  name: string;
+  city: string;
   status: string;
   battery: number;
   speed: number;
-  location: ScooterLocation;
+  coordinates: ScooterCoordinates;
 }
 
 export interface FetchScootersParams {
