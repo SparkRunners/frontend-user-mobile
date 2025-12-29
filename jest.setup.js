@@ -34,3 +34,19 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 
+
+// Mock react-native-maps
+jest.mock('react-native-maps', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const MockMapView = (props) => {
+    return React.createElement(View, { ...props }, props.children);
+  };
+  MockMapView.Marker = (props) => React.createElement(View, { ...props }, props.children);
+  return {
+    __esModule: true,
+    default: MockMapView,
+    PROVIDER_DEFAULT: 'default',
+    PROVIDER_GOOGLE: 'google',
+  };
+});
