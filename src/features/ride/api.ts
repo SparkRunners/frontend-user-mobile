@@ -3,6 +3,39 @@ import { Ride } from './types';
 // Mock delay helper
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const mockHistory: Ride[] = [
+  {
+    id: 'ride_001',
+    scooterId: 'SCOOT-102',
+    userId: 'user_123',
+    startTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1 - 1000 * 60 * 18).toISOString(),
+    endTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
+    status: 'completed',
+    cost: 46,
+    durationSeconds: 1080,
+  },
+  {
+    id: 'ride_002',
+    scooterId: 'SCOOT-224',
+    userId: 'user_123',
+    startTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3 - 1000 * 60 * 25).toISOString(),
+    endTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
+    status: 'completed',
+    cost: 52,
+    durationSeconds: 1200,
+  },
+  {
+    id: 'ride_003',
+    scooterId: 'SCOOT-310',
+    userId: 'user_123',
+    startTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7 - 1000 * 60 * 12).toISOString(),
+    endTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
+    status: 'completed',
+    cost: 38,
+    durationSeconds: 780,
+  },
+];
+
 export const rideApi = {
   startRide: async (scooterId: string): Promise<Ride> => {
     await delay(1000);
@@ -39,5 +72,11 @@ export const rideApi = {
     await delay(500);
     // Return null to simulate no active ride initially
     return null;
+  },
+
+  getRideHistory: async (): Promise<Ride[]> => {
+    await delay(800);
+    // Return a shallow copy so downstream consumers can safely mutate
+    return mockHistory.map(ride => ({ ...ride }));
   }
 };
