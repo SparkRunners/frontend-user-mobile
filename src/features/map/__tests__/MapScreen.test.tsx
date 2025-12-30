@@ -9,6 +9,22 @@ jest.mock('../../scooters/api', () => ({
   unlockScooter: jest.fn(),
 }));
 
+// Mock Ride feature
+const mockStartRide = jest.fn();
+jest.mock('../../ride', () => ({
+  useRide: () => ({
+    startRide: mockStartRide,
+    endRide: jest.fn(),
+    isRiding: false,
+    currentRide: null,
+    durationSeconds: 0,
+    currentCost: 0,
+    isLoading: false,
+  }),
+  RideDashboard: () => <mock-ride-dashboard testID="ride-dashboard" />,
+  TripSummary: () => <mock-trip-summary testID="trip-summary" />,
+}));
+
 // Mock ScanScreen
 jest.mock('../../scan', () => ({
   ScanScreen: ({ onScanSuccess, onClose }: any) => (
@@ -97,9 +113,9 @@ describe('MapScreen', () => {
     // Trigger scan success (simulated by our mock)
     fireEvent(scanScreen, 'onScanSuccess');
     
-    // Verify unlockScooter was called
+    // Verify startRide was called
     await waitFor(() => {
-      expect(unlockScooter).toHaveBeenCalledWith(3124);
+      expect(mockStartRide).toHaveBeenCalledWith('3124');
     });
   });
 });

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker } from 'react-native-maps';
 import { theme } from '../../theme';
-import { fetchScooters, unlockScooter, Scooter } from '../scooters/api';
+import { fetchScooters, Scooter } from '../scooters/api';
 import { ScanScreen } from '../scan';
+import { useRide, RideDashboard, TripSummary } from '../ride';
 import Toast from 'react-native-toast-message';
 
 const STOCKHOLM_REGION = {
@@ -17,6 +18,7 @@ export const MapScreen = () => {
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [scooters, setScooters] = useState<Scooter[]>([]);
   const [showScanner, setShowScanner] = useState(false);
+  const { startRide, isRiding } = useRide();
 
   useEffect(() => {
     const loadScooters = async () => {
@@ -36,12 +38,8 @@ export const MapScreen = () => {
     setShowScanner(false);
     
     // Parse scooter ID from code (assuming code is the ID for now)
-    const scooterId = parseInt(code, 10);
-    
-    if (isNaN(scooterId)) {
-      Alert.alert('Fel', 'Ogiltig QR-kod');
-      return;
-    }
+    // In a real app, we might validate the format
+    const scooterId = code;
 
     try {
       Toast.show({
@@ -50,7 +48,7 @@ export const MapScreen = () => {
         position: 'bottom',
       });
 
-      await unlockScooter(scooterId);
+      await startRide(scooterId);
       
       Toast.show({
         type: 'success',
@@ -59,7 +57,6 @@ export const MapScreen = () => {
         position: 'bottom',
       });
       
-      // Optionally refresh scooters or update UI
     } catch (error) {
       console.error('Unlock failed:', error);
       Alert.alert('Fel', 'Kunde inte låsa upp skotern. Försök igen.');
@@ -118,13 +115,17 @@ export const MapScreen = () => {
             })}
           </MapView>
 
-          {!selectedScooter && (
-            <TouchableOpacity
-              style={styles.scanButton}
-              onPress={() => setShowScanner(true)}
-            >
-              <Text style={styles.scanButtonText}>Skanna</Text>
-            </TouchableOpacity>
+          {isRiding ? (
+            <RideDashboard />
+          ) : (
+            !selectedScooter && (
+              <TouchableOpacity
+                style={styles.scanButton}
+                onPress={() => setShowScanner(true)}
+              >
+                <Text style={styles.scanButtonText}>Skanna</Text>
+              </TouchableOpacity>
+            )
           )}
 
           {selectedScooter && (
@@ -143,13 +144,21 @@ export const MapScreen = () => {
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.actionButton}>
+              <TouchableOpacity 
+                style={styles.actionButton}
+                onPress={() => {
+                  setSelectedScooter(null);
+                  setShowScanner(true);
+                }}
+              >
                 <Text style={styles.actionButtonText}>Starta resa</Text>
               </TouchableOpacity>
             </View>
           )}
         </>
       )}
+      
+      <TripSummary />
     </View>
   );
 };
