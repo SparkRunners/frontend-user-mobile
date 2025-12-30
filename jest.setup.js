@@ -1,3 +1,25 @@
+require('react-native-gesture-handler/jestSetup');
+
+jest.mock('react-native-reanimated', () => {
+  const Reanimated = require('react-native-reanimated/mock');
+  Reanimated.default.call = () => {};
+  return Reanimated;
+});
+
+jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper', () => ({}), { virtual: true });
+
+jest.mock('react-native-screens', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const MockScreen = React.forwardRef((props, ref) => React.createElement(View, { ref, ...props }, props.children));
+  const MockScreenContainer = ({ children }) => React.createElement(View, null, children);
+  return {
+    enableScreens: jest.fn(),
+    Screen: MockScreen,
+    ScreenContainer: MockScreenContainer,
+  };
+});
+
 // Mock react-native-keychain
 jest.mock('react-native-keychain', () => ({
   setGenericPassword: jest.fn(),
@@ -24,10 +46,14 @@ jest.mock('react-native-toast-message', () => {
 
 // Mock react-native-safe-area-context
 jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
   const inset = { top: 0, right: 0, bottom: 0, left: 0 };
+  const SafeAreaInsetsContext = React.createContext(inset);
   return {
-    SafeAreaProvider: jest.fn(({ children }) => children),
-    SafeAreaConsumer: jest.fn(({ children }) => children(inset)),
+    SafeAreaProvider: ({ children }) => children,
+    SafeAreaView: ({ children, ...props }) => React.createElement('View', props, children),
+    SafeAreaConsumer: ({ children }) => children(inset),
+    SafeAreaInsetsContext,
     useSafeAreaInsets: jest.fn(() => inset),
     useSafeAreaFrame: jest.fn(() => ({ x: 0, y: 0, width: 390, height: 844 })),
   };

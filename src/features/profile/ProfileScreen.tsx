@@ -66,10 +66,16 @@ export const ProfileScreen = () => {
           </Text>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           {isLoading && rides.length === 0 ? (
-            <ActivityIndicator color={theme.colors.brand} style={styles.loader} />
+            <ActivityIndicator
+              color={theme.colors.brand}
+              style={styles.loader}
+              testID="ride-history-loader"
+            />
           ) : null}
           {!isLoading && rides.length === 0 ? (
-            <Text style={styles.emptyState}>Du har inga resor ännu.</Text>
+            <Text style={styles.emptyState} testID="ride-history-empty">
+              Du har inga resor ännu.
+            </Text>
           ) : null}
           {rides.map(ride => (
             <RideHistoryItem ride={ride} key={ride.id} />
