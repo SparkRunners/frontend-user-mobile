@@ -4,11 +4,13 @@ import { rideApi } from './api';
 
 interface RideContextType {
   currentRide: Ride | null;
+  lastRide: Ride | null;
   isRiding: boolean;
   durationSeconds: number;
   currentCost: number;
   startRide: (scooterId: string) => Promise<void>;
   endRide: () => Promise<void>;
+  clearLastRide: () => void;
   isLoading: boolean;
 }
 
@@ -16,6 +18,7 @@ const RideContext = createContext<RideContextType | undefined>(undefined);
 
 export const RideProvider = ({ children }: { children: ReactNode }) => {
   const [currentRide, setCurrentRide] = useState<Ride | null>(null);
+  const [lastRide, setLastRide] = useState<Ride | null>(null);
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -43,6 +46,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
 
   const startRide = async (scooterId: string) => {
     setIsLoading(true);
+    setLastRide(null);
     try {
       const ride = await rideApi.startRide(scooterId);
       setCurrentRide(ride);
@@ -59,7 +63,11 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     if (!currentRide) return;
     setIsLoading(true);
     try {
-      await rideApi.endRide(currentRide.id);
+      const completedRide = await rideApi.endRide(currentRide.id);
+      // Update the completed ride with actual duration and cost calculated locally if needed,
+      // or trust the backend response. Here we use the backend response but ensure cost matches what user saw if possible.
+      // For now, we trust the mock API response.
+      setLastRide(completedRide);
       setCurrentRide(null);
       setDurationSeconds(0);
     } catch (error) {
@@ -70,14 +78,20 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const clearLastRide = () => {
+    setLastRide(null);
+  };
+
   return (
     <RideContext.Provider value={{
       currentRide,
+      lastRide,
       isRiding,
       durationSeconds,
       currentCost,
       startRide,
       endRide,
+      clearLastRide,
       isLoading
     }}>
       {children}

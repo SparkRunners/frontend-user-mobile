@@ -4,7 +4,7 @@ import MapView, { PROVIDER_DEFAULT, Marker } from 'react-native-maps';
 import { theme } from '../../theme';
 import { fetchScooters, Scooter } from '../scooters/api';
 import { ScanScreen } from '../scan';
-import { useRide, RideDashboard } from '../ride';
+import { useRide, RideDashboard, TripSummary } from '../ride';
 import Toast from 'react-native-toast-message';
 
 const STOCKHOLM_REGION = {
@@ -157,6 +157,8 @@ export const MapScreen = () => {
           )}
         </>
       )}
+      
+      <TripSummary />
     </View>
   );
 };

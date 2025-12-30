@@ -22,6 +22,7 @@ jest.mock('../../ride', () => ({
     isLoading: false,
   }),
   RideDashboard: () => <mock-ride-dashboard testID="ride-dashboard" />,
+  TripSummary: () => <mock-trip-summary testID="trip-summary" />,
 }));
 
 // Mock ScanScreen
