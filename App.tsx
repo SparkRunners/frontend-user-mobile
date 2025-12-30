@@ -6,45 +6,37 @@
  */
 
 import React from 'react';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-} from 'react-native-safe-area-context';
+import { StatusBar, StyleSheet, useColorScheme } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { AuthGate, AuthProvider } from './src/auth';
-import { MapScreen } from './src/features/map';
 import { RideProvider } from './src/features/ride';
-import { runtimeConfig } from './src/config';
 import { theme } from './src/theme';
+import { AppNavigator } from './src/navigation/AppNavigator';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 function App() {
   const isDarkMode = useColorScheme() === 'dark';
 
   return (
-    <AuthProvider>
-      <RideProvider>
-        <SafeAreaProvider>
-          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-          <AuthGate>
-            <AppContent />
-          </AuthGate>
-          <Toast />
-        </SafeAreaProvider>
-      </RideProvider>
-    </AuthProvider>
-  );
-}
-
-function AppContent() {
-  return (
-    <View style={styles.container}>
-      <MapScreen />
-    </View>
+    <GestureHandlerRootView style={styles.root}>
+      <AuthProvider>
+        <RideProvider>
+          <SafeAreaProvider>
+            <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+            <AuthGate>
+              <AppNavigator />
+            </AuthGate>
+            <Toast />
+          </SafeAreaProvider>
+        </RideProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
     backgroundColor: theme.colors.background,
   },

@@ -21,8 +21,10 @@ This repository hosts the SparkRunner user app built with React Native CLI. It i
 3. Install CocoaPods (first run or whenever native deps change):
 	```bash
 	cd ios
-	export LANG=en_US.UTF-8 && export LC_ALL=en_US.UTF-8
-	pod install
+	# Ensure the Ruby gems defined in ios/Gemfile are installed
+	bundle install        # run `gem install bundler` first if the command is missing
+	# Use the bundled CocoaPods version so everyone links the same native deps
+	bundle exec pod install --repo-update
 	cd ..
 	```
 4. (Optional) Start the mock services:
@@ -65,6 +67,11 @@ npm run android
 - Health check: `npx react-native doctor` highlights missing dependencies.
 - Metro already running on 8081? Kill the old process via `lsof -i :8081`.
 - Config warnings such as `[config] Environment variable ... is missing` mean the corresponding key is missing in `.env`.
+- Installing new native dependencies or seeing native module errors usually means the iOS/Android build cache needs a cleanup. Use this checklist:
+	1. Stop Metro and close the running app in the simulator/device.
+	2. iOS cleanup & rebuild (from repo root): `cd ios && bundle install && bundle exec pod install --repo-update && xcodebuild clean && cd ..`, then `npx react-native run-ios`. If `xcodebuild clean` refuses to delete `ios/build`, remove the folder manually (`rm -rf ios/build`) and rerun the command.
+	3. Android cleanup & rebuild: `cd android && ./gradlew clean && cd ..`, then `npx react-native run-android`.
+	4. Metro cache reset (optional): `npx react-native start --reset-cache`.
 
 # Next Steps
 
