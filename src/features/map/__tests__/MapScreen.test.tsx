@@ -1,11 +1,23 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { MapScreen } from '../MapScreen';
-import { fetchScooters } from '../../scooters/api';
+import { fetchScooters, unlockScooter } from '../../scooters/api';
 
 // Mock the API
 jest.mock('../../scooters/api', () => ({
   fetchScooters: jest.fn(),
+  unlockScooter: jest.fn(),
+}));
+
+// Mock ScanScreen
+jest.mock('../../scan', () => ({
+  ScanScreen: ({ onScanSuccess, onClose }: any) => (
+    <mock-scan-screen 
+      testID="scan-screen" 
+      onScanSuccess={() => onScanSuccess('3124')}
+      onClose={onClose}
+    />
+  ),
 }));
 
 const MOCK_API_SCOOTERS = [
@@ -66,6 +78,29 @@ describe('MapScreen', () => {
     expect(getByText(`Scooter ID: ${scooter.id}`)).toBeTruthy();
     expect(getByText(`${scooter.battery}%`)).toBeTruthy();
     expect(getByText('Starta resa')).toBeTruthy();
+  });
+
+  it('opens scanner and unlocks scooter', async () => {
+    const { getByText, getByTestId } = render(<MapScreen />);
+    
+    // Wait for scooters to load so the scan button appears (it appears when no scooter is selected)
+    await waitFor(() => expect(fetchScooters).toHaveBeenCalled());
+    
+    // Find and press scan button
+    const scanButton = getByText('Skanna');
+    fireEvent.press(scanButton);
+    
+    // Check if ScanScreen is rendered
+    const scanScreen = getByTestId('scan-screen');
+    expect(scanScreen).toBeTruthy();
+    
+    // Trigger scan success (simulated by our mock)
+    fireEvent(scanScreen, 'onScanSuccess');
+    
+    // Verify unlockScooter was called
+    await waitFor(() => {
+      expect(unlockScooter).toHaveBeenCalledWith(3124);
+    });
   });
 });
 
