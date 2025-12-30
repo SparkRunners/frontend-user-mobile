@@ -52,3 +52,12 @@ jest.mock('react-native-maps', () => {
     PROVIDER_GOOGLE: 'google',
   };
 });
+
+// Mock react-native-camera-kit
+jest.mock('react-native-camera-kit', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    CameraScreen: (props) => React.createElement(View, { ...props, testID: 'camera-screen' }),
+  };
+});

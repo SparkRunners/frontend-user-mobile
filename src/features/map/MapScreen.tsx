@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker } from 'react-native-maps';
 import { theme } from '../../theme';
-import { fetchScooters, Scooter } from '../scooters/api';
+import { fetchScooters, unlockScooter, Scooter } from '../scooters/api';
+import { ScanScreen } from '../scan';
+import Toast from 'react-native-toast-message';
 
 const STOCKHOLM_REGION = {
   latitude: 59.3293,
@@ -14,6 +16,7 @@ const STOCKHOLM_REGION = {
 export const MapScreen = () => {
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [scooters, setScooters] = useState<Scooter[]>([]);
+  const [showScanner, setShowScanner] = useState(false);
 
   useEffect(() => {
     const loadScooters = async () => {
@@ -29,71 +32,123 @@ export const MapScreen = () => {
     loadScooters();
   }, []);
 
+  const handleScanSuccess = async (code: string) => {
+    setShowScanner(false);
+    
+    // Parse scooter ID from code (assuming code is the ID for now)
+    const scooterId = parseInt(code, 10);
+    
+    if (isNaN(scooterId)) {
+      Alert.alert('Fel', 'Ogiltig QR-kod');
+      return;
+    }
+
+    try {
+      Toast.show({
+        type: 'info',
+        text1: 'Låser upp...',
+        position: 'bottom',
+      });
+
+      await unlockScooter(scooterId);
+      
+      Toast.show({
+        type: 'success',
+        text1: 'Upplåst!',
+        text2: 'Du kan nu börja din resa.',
+        position: 'bottom',
+      });
+      
+      // Optionally refresh scooters or update UI
+    } catch (error) {
+      console.error('Unlock failed:', error);
+      Alert.alert('Fel', 'Kunde inte låsa upp skotern. Försök igen.');
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <MapView
-        testID="map-view"
-        provider={PROVIDER_DEFAULT}
-        style={styles.map}
-        initialRegion={STOCKHOLM_REGION}
-        showsUserLocation={true}
-        showsMyLocationButton={true}
-        onPress={() => setSelectedScooter(null)}
-      >
-        {scooters.map((scooter) => {
-          const latitude = scooter.coordinates?.latitude;
-          const longitude = scooter.coordinates?.longitude;
+      {showScanner ? (
+        <ScanScreen
+          onClose={() => setShowScanner(false)}
+          onScanSuccess={handleScanSuccess}
+        />
+      ) : (
+        <>
+          <MapView
+            testID="map-view"
+            provider={PROVIDER_DEFAULT}
+            style={styles.map}
+            initialRegion={STOCKHOLM_REGION}
+            showsUserLocation={true}
+            showsMyLocationButton={true}
+            onPress={() => setSelectedScooter(null)}
+          >
+            {scooters.map((scooter) => {
+              const latitude = scooter.coordinates?.latitude;
+              const longitude = scooter.coordinates?.longitude;
 
-          if (typeof latitude !== 'number' || typeof longitude !== 'number') {
-            return null;
-          }
+              if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+                return null;
+              }
 
-          return (
-            <Marker
-              key={scooter.id}
-              testID={`marker-${scooter.id}`}
-              coordinate={{
-                latitude,
-                longitude,
-              }}
-              onPress={(e) => {
-                if (e && e.stopPropagation) {
-                  e.stopPropagation();
-                }
-                setSelectedScooter(scooter);
-              }}
+              return (
+                <Marker
+                  key={scooter.id}
+                  testID={`marker-${scooter.id}`}
+                  coordinate={{
+                    latitude,
+                    longitude,
+                  }}
+                  onPress={(e) => {
+                    if (e && e.stopPropagation) {
+                      e.stopPropagation();
+                    }
+                    setSelectedScooter(scooter);
+                  }}
+                >
+                  <View style={[
+                    styles.marker,
+                    selectedScooter?.id === scooter.id && styles.markerSelected
+                  ]}>
+                    <View style={styles.markerIcon} />
+                  </View>
+                </Marker>
+              );
+            })}
+          </MapView>
+
+          {!selectedScooter && (
+            <TouchableOpacity
+              style={styles.scanButton}
+              onPress={() => setShowScanner(true)}
             >
-              <View style={[
-                styles.marker,
-                selectedScooter?.id === scooter.id && styles.markerSelected
-              ]}>
-                <View style={styles.markerIcon} />
+              <Text style={styles.scanButtonText}>Skanna</Text>
+            </TouchableOpacity>
+          )}
+
+          {selectedScooter && (
+            <View style={styles.bottomSheet}>
+              <View style={styles.handle} />
+              <Text style={styles.scooterId}>Scooter ID: {selectedScooter.id}</Text>
+              
+              <View style={styles.statsContainer}>
+                <View style={styles.statBox}>
+                  <Text style={styles.statLabel}>Batteri</Text>
+                  <Text style={styles.statValue}>{selectedScooter.battery}%</Text>
+                </View>
+                <View style={styles.statBox}>
+                  <Text style={styles.statLabel}>Avstånd</Text>
+                  <Text style={styles.statValue}>300 m bort</Text>
+                </View>
               </View>
-            </Marker>
-          );
-        })}
-      </MapView>
 
-      {selectedScooter && (
-        <View style={styles.bottomSheet}>
-          <View style={styles.handle} />
-          <Text style={styles.scooterId}>Scooter ID: {selectedScooter.id}</Text>
-          
-          <View style={styles.statsContainer}>
-            <View style={styles.statBox}>
-              <Text style={styles.statLabel}>Batteri</Text>
-              <Text style={styles.statValue}>{selectedScooter.battery}%</Text>
+              <TouchableOpacity style={styles.actionButton}>
+                <Text style={styles.actionButtonText}>Starta resa</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statLabel}>Avstånd</Text>
-              <Text style={styles.statValue}>300 m bort</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity style={styles.actionButton}>
-            <Text style={styles.actionButtonText}>Starta resa</Text>
-          </TouchableOpacity>
-        </View>
+          )}
+        </>
       )}
     </View>
   );
@@ -197,6 +252,25 @@ const styles = StyleSheet.create({
   actionButtonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  scanButton: {
+    position: 'absolute',
+    bottom: 40,
+    alignSelf: 'center',
+    backgroundColor: theme.colors.brand,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  scanButtonText: {
+    color: 'white',
+    fontSize: 18,
     fontWeight: 'bold',
   },
 });
