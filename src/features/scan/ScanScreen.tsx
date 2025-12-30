@@ -44,6 +44,16 @@ export const ScanScreen = ({ onClose, onScanSuccess }: ScanScreenProps) => {
         <Text style={styles.instructionText}>
           Rikta kameran mot QR-koden på styret
         </Text>
+        
+        {/* Dev Helper: Simulate Scan */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.devButton}
+            onPress={() => onScanSuccess('123456')}
+          >
+            <Text style={styles.devButtonText}>[DEV] Simulera Skanning</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -86,10 +96,11 @@ const styles = StyleSheet.create({
   },
   overlay: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 80,
     left: 0,
     right: 0,
     alignItems: 'center',
+    gap: 20,
   },
   instructionText: {
     color: 'white',
@@ -99,5 +110,16 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     overflow: 'hidden',
+  },
+  devButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  devButtonText: {
+    color: 'black',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });
