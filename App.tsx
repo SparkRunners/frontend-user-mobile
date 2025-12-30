@@ -13,6 +13,7 @@ import {
 import Toast from 'react-native-toast-message';
 import { AuthGate, AuthProvider } from './src/auth';
 import { MapScreen } from './src/features/map';
+import { RideProvider } from './src/features/ride';
 import { runtimeConfig } from './src/config';
 import { theme } from './src/theme';
 
@@ -21,13 +22,15 @@ function App() {
 
   return (
     <AuthProvider>
-      <SafeAreaProvider>
-        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-        <AuthGate>
-          <AppContent />
-        </AuthGate>
-        <Toast />
-      </SafeAreaProvider>
+      <RideProvider>
+        <SafeAreaProvider>
+          <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+          <AuthGate>
+            <AppContent />
+          </AuthGate>
+          <Toast />
+        </SafeAreaProvider>
+      </RideProvider>
     </AuthProvider>
   );
 }
