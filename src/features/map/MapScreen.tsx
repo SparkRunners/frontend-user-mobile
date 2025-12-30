@@ -81,17 +81,18 @@ export const MapScreen = () => {
             showsMyLocationButton={true}
             onPress={() => setSelectedScooter(null)}
           >
-            {scooters.map((scooter) => {
+            {scooters.map((scooter, index) => {
               const latitude = scooter.coordinates?.latitude;
               const longitude = scooter.coordinates?.longitude;
 
               if (typeof latitude !== 'number' || typeof longitude !== 'number') {
                 return null;
               }
+              const markerKey = scooter.id ?? index;
 
               return (
                 <Marker
-                  key={scooter.id}
+                  key={`${markerKey}-${latitude}-${longitude}`}
                   testID={`marker-${scooter.id}`}
                   coordinate={{
                     latitude,
