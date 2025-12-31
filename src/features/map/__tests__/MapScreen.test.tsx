@@ -68,6 +68,13 @@ describe('MapScreen', () => {
     await waitFor(() => expect(fetchScooters).toHaveBeenCalled());
   });
 
+  it('renders zone legend and zoom controls', () => {
+    const { getByTestId } = render(<MapScreen />);
+    expect(getByTestId('zone-legend')).toBeTruthy();
+    expect(getByTestId('zoom-in-button')).toBeTruthy();
+    expect(getByTestId('zoom-out-button')).toBeTruthy();
+  });
+
   it('renders markers for all scooters', async () => {
     const { getByTestId } = render(<MapScreen />);
     
