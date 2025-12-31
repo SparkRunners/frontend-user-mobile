@@ -73,6 +73,15 @@ const MOCK_API_SCOOTERS = [
   },
 ];
 
+jest.mock('../../scooters/useScootersFeed', () => ({
+  useScootersFeed: () => ({
+    scooters: MOCK_API_SCOOTERS,
+    isLoading: false,
+    error: null,
+    refetch: jest.fn(),
+  }),
+}));
+
 describe('MapScreen', () => {
   beforeEach(() => {
     (fetchScooters as jest.Mock).mockResolvedValue(MOCK_API_SCOOTERS);
@@ -81,7 +90,6 @@ describe('MapScreen', () => {
   it('renders the map with correct initial region', async () => {
     const { getByTestId } = render(<MapScreen />);
     expect(getByTestId('map-view')).toBeTruthy();
-    await waitFor(() => expect(fetchScooters).toHaveBeenCalled());
   });
 
   it('renders zone legend and zoom controls', () => {
@@ -94,10 +102,8 @@ describe('MapScreen', () => {
   it('renders markers for all scooters', async () => {
     const { getByTestId } = render(<MapScreen />);
     
-    await waitFor(() => {
-      MOCK_API_SCOOTERS.forEach(scooter => {
-        expect(getByTestId(`marker-${scooter.id}`)).toBeTruthy();
-      });
+    MOCK_API_SCOOTERS.forEach(scooter => {
+      expect(getByTestId(`marker-${scooter.id}`)).toBeTruthy();
     });
   });
 
@@ -125,9 +131,6 @@ describe('MapScreen', () => {
 
   it('opens scanner and unlocks scooter', async () => {
     const { getByText, getByTestId } = render(<MapScreen />);
-    
-    // Wait for scooters to load so the scan button appears (it appears when no scooter is selected)
-    await waitFor(() => expect(fetchScooters).toHaveBeenCalled());
     
     // Find and press scan button
     const scanButton = getByText('Skanna');

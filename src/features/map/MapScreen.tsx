@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { ActivityIndicator, StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker, Polygon } from 'react-native-maps';
 import { theme } from '../../theme';
-import { fetchScooters, Scooter } from '../scooters/api';
+import { Scooter } from '../scooters/api';
 import { ScanScreen } from '../scan';
 import { useRide, RideDashboard, TripSummary } from '../ride';
 import Toast from 'react-native-toast-message';
 import { useZones } from './zones/useZones';
 import { usePricing } from '../pricing/usePricing';
+import { useScootersFeed } from '../scooters/useScootersFeed';
 
 const STOCKHOLM_REGION = {
   latitude: 59.3293,
@@ -28,7 +29,6 @@ const formatPrice = (value: number, currency: string) => {
 
 export const MapScreen = () => {
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
-  const [scooters, setScooters] = useState<Scooter[]>([]);
   const [showScanner, setShowScanner] = useState(false);
   const [mapRegion, setMapRegion] = useState(STOCKHOLM_REGION);
   const mapRef = useRef<MapView | null>(null);
@@ -40,20 +40,12 @@ export const MapScreen = () => {
     error: pricingError,
     refetch: refetchPricing,
   } = usePricing();
-
-  useEffect(() => {
-    const loadScooters = async () => {
-      try {
-        const data = await fetchScooters();
-        setScooters(data);
-      } catch (error) {
-        console.error('Failed to fetch scooters:', error);
-        Alert.alert('Error', 'Failed to load scooters');
-      }
-    };
-
-    loadScooters();
-  }, []);
+  const {
+    scooters,
+    isLoading: scootersLoading,
+    error: scootersError,
+    refetch: refetchScooters,
+  } = useScootersFeed();
 
   const handleScanSuccess = async (code: string) => {
     setShowScanner(false);
@@ -195,6 +187,17 @@ export const MapScreen = () => {
               </TouchableOpacity>
             )
           )}
+
+          {scootersError ? (
+            <TouchableOpacity
+              style={styles.feedErrorBanner}
+              onPress={refetchScooters}
+              testID="scooter-feed-error"
+            >
+              <Text style={styles.feedErrorText}>{scootersError}</Text>
+              <Text style={styles.feedRetryText}>Tryck för att försöka igen</Text>
+            </TouchableOpacity>
+          ) : null}
 
           <View style={styles.legendContainer} testID="zone-legend">
             <View style={styles.legendRow}>
@@ -436,6 +439,26 @@ const styles = StyleSheet.create({
       fontWeight: '600',
     },
     pricingRetryText: {
+      color: theme.colors.text,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    feedErrorBanner: {
+      position: 'absolute',
+      bottom: 110,
+      left: 20,
+      right: 20,
+      backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.15)',
+      borderRadius: 12,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.danger,
+    },
+    feedErrorText: {
+      color: theme.colors.danger,
+      fontWeight: '600',
+    },
+    feedRetryText: {
       color: theme.colors.text,
       fontSize: 12,
       marginTop: 4,
