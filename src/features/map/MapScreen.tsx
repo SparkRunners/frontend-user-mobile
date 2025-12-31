@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
+import { ActivityIndicator, StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker, Polygon } from 'react-native-maps';
 import { theme } from '../../theme';
 import { fetchScooters, Scooter } from '../scooters/api';
@@ -7,6 +7,7 @@ import { ScanScreen } from '../scan';
 import { useRide, RideDashboard, TripSummary } from '../ride';
 import Toast from 'react-native-toast-message';
 import { useZones } from './zones/useZones';
+import { usePricing } from '../pricing/usePricing';
 
 const STOCKHOLM_REGION = {
   latitude: 59.3293,
@@ -19,6 +20,12 @@ const MIN_DELTA = 0.005;
 const MAX_DELTA = 0.5;
 const ZOOM_FACTOR = 0.5;
 
+const formatPrice = (value: number, currency: string) => {
+  const hasFraction = Math.abs(value % 1) > 0;
+  const formatted = hasFraction ? value.toFixed(2) : value.toFixed(0);
+  return `${formatted} ${currency}`;
+};
+
 export const MapScreen = () => {
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [scooters, setScooters] = useState<Scooter[]>([]);
@@ -27,6 +34,12 @@ export const MapScreen = () => {
   const mapRef = useRef<MapView | null>(null);
   const { startRide, isRiding } = useRide();
   const { allowedZones, parkingZones } = useZones();
+  const {
+    pricing,
+    isLoading: pricingLoading,
+    error: pricingError,
+    refetch: refetchPricing,
+  } = usePricing();
 
   useEffect(() => {
     const loadScooters = async () => {
@@ -227,6 +240,54 @@ export const MapScreen = () => {
                 </View>
               </View>
 
+              <View style={styles.pricingCard} testID="pricing-info">
+                <View style={styles.pricingHeaderRow}>
+                  <Text style={styles.pricingTitle}>Priser</Text>
+                  {pricing?.updatedAt ? (
+                    <Text style={styles.pricingUpdated}>
+                      Uppdaterad {new Date(pricing.updatedAt).toLocaleDateString('sv-SE')}
+                    </Text>
+                  ) : null}
+                </View>
+                {pricingLoading ? (
+                  <View style={styles.pricingLoadingRow}>
+                    <ActivityIndicator color={theme.colors.brand} size="small" />
+                    <Text style={styles.pricingLoadingText}>Hämtar prisinfo...</Text>
+                  </View>
+                ) : pricing ? (
+                  <>
+                    <View style={styles.pricingValues}>
+                      <View style={styles.pricingValueCol}>
+                        <Text style={styles.pricingLabel}>Startavgift</Text>
+                        <Text style={styles.pricingValue}>
+                          {formatPrice(pricing.baseFare, pricing.currency)}
+                        </Text>
+                      </View>
+                      <View style={styles.pricingDivider} />
+                      <View style={styles.pricingValueCol}>
+                        <Text style={styles.pricingLabel}>Minutpris</Text>
+                        <Text style={styles.pricingValue}>
+                          {formatPrice(pricing.perMinute, pricing.currency)}/min
+                        </Text>
+                      </View>
+                    </View>
+                    {pricing.note ? (
+                      <Text style={styles.pricingNote}>{pricing.note}</Text>
+                    ) : null}
+                  </>
+                ) : (
+                  <TouchableOpacity
+                    onPress={refetchPricing}
+                    style={styles.pricingErrorContainer}
+                  >
+                    <Text style={styles.pricingErrorText}>
+                      {pricingError ?? 'Kunde inte hämta prisinfo.'}
+                    </Text>
+                    <Text style={styles.pricingRetryText}>Tryck för att försöka igen</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
               <TouchableOpacity 
                 style={styles.actionButton}
                 onPress={() => {
@@ -305,6 +366,80 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: '#E5E7EB',
     borderRadius: 2,
+    pricingCard: {
+      backgroundColor: theme.colors.background,
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: 20,
+      gap: 12,
+    },
+    pricingHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    pricingTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    pricingUpdated: {
+      fontSize: 11,
+      color: theme.colors.textMuted,
+    },
+    pricingValues: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    pricingValueCol: {
+      flex: 1,
+    },
+    pricingLabel: {
+      fontSize: 13,
+      color: theme.colors.textMuted,
+      marginBottom: 4,
+    },
+    pricingValue: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    pricingDivider: {
+      width: 1,
+      height: '100%',
+      backgroundColor: theme.colors.border,
+      marginHorizontal: 12,
+    },
+    pricingNote: {
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      lineHeight: 16,
+    },
+    pricingLoadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    pricingLoadingText: {
+      color: theme.colors.text,
+    },
+    pricingErrorContainer: {
+      backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.08)',
+      padding: 12,
+      borderRadius: 12,
+    },
+    pricingErrorText: {
+      color: theme.colors.danger,
+      fontWeight: '600',
+    },
+    pricingRetryText: {
+      color: theme.colors.text,
+      fontSize: 12,
+      marginTop: 4,
+    },
     alignSelf: 'center',
     marginBottom: 16,
   },

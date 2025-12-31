@@ -36,6 +36,22 @@ jest.mock('../../scan', () => ({
   ),
 }));
 
+jest.mock('../../pricing/usePricing', () => ({
+  usePricing: () => ({
+    pricing: {
+      city: 'Stockholm',
+      currency: 'kr',
+      baseFare: 10,
+      perMinute: 2.5,
+      note: 'Mock pricing',
+      updatedAt: '2025-01-01T12:00:00.000Z',
+    },
+    isLoading: false,
+    error: null,
+    refetch: jest.fn(),
+  }),
+}));
+
 const MOCK_API_SCOOTERS = [
   {
     id: 3124,
@@ -101,6 +117,10 @@ describe('MapScreen', () => {
     expect(getByText(`Scooter ID: ${scooter.id}`)).toBeTruthy();
     expect(getByText(`${scooter.battery}%`)).toBeTruthy();
     expect(getByText('Starta resa')).toBeTruthy();
+    expect(getByTestId('pricing-info')).toBeTruthy();
+    expect(getByText('Startavgift')).toBeTruthy();
+    expect(getByText('10 kr')).toBeTruthy();
+    expect(getByText('2.50 kr/min')).toBeTruthy();
   });
 
   it('opens scanner and unlocks scooter', async () => {
