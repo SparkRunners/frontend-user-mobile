@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
-import MapView, { PROVIDER_DEFAULT, Marker } from 'react-native-maps';
+import MapView, { PROVIDER_DEFAULT, Marker, Polygon } from 'react-native-maps';
 import { theme } from '../../theme';
 import { fetchScooters, Scooter } from '../scooters/api';
 import { ScanScreen } from '../scan';
 import { useRide, RideDashboard, TripSummary } from '../ride';
 import Toast from 'react-native-toast-message';
+import { useZones } from './zones/useZones';
 
 const STOCKHOLM_REGION = {
   latitude: 59.3293,
@@ -14,11 +15,18 @@ const STOCKHOLM_REGION = {
   longitudeDelta: 0.0421,
 };
 
+const MIN_DELTA = 0.005;
+const MAX_DELTA = 0.5;
+const ZOOM_FACTOR = 0.5;
+
 export const MapScreen = () => {
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [scooters, setScooters] = useState<Scooter[]>([]);
   const [showScanner, setShowScanner] = useState(false);
+  const [mapRegion, setMapRegion] = useState(STOCKHOLM_REGION);
+  const mapRef = useRef<MapView | null>(null);
   const { startRide, isRiding } = useRide();
+  const { allowedZones, parkingZones } = useZones();
 
   useEffect(() => {
     const loadScooters = async () => {
@@ -63,6 +71,29 @@ export const MapScreen = () => {
     }
   };
 
+  const adjustZoom = useCallback((scale: number) => {
+    setMapRegion(prev => {
+      const nextLatitudeDelta = Math.min(
+        Math.max(prev.latitudeDelta * scale, MIN_DELTA),
+        MAX_DELTA,
+      );
+      const nextLongitudeDelta = Math.min(
+        Math.max(prev.longitudeDelta * scale, MIN_DELTA),
+        MAX_DELTA,
+      );
+      const nextRegion = {
+        ...prev,
+        latitudeDelta: nextLatitudeDelta,
+        longitudeDelta: nextLongitudeDelta,
+      };
+      mapRef.current?.animateToRegion?.(nextRegion, 200);
+      return nextRegion;
+    });
+  }, []);
+
+  const handleZoomIn = useCallback(() => adjustZoom(ZOOM_FACTOR), [adjustZoom]);
+  const handleZoomOut = useCallback(() => adjustZoom(1 / ZOOM_FACTOR), [adjustZoom]);
+
   return (
     <View style={styles.container}>
       {showScanner ? (
@@ -73,14 +104,37 @@ export const MapScreen = () => {
       ) : (
         <>
           <MapView
+            ref={mapRef}
             testID="map-view"
             provider={PROVIDER_DEFAULT}
             style={styles.map}
             initialRegion={STOCKHOLM_REGION}
+            region={mapRegion}
             showsUserLocation={true}
             showsMyLocationButton={true}
             onPress={() => setSelectedScooter(null)}
+            onRegionChangeComplete={region => setMapRegion(region)}
           >
+            {allowedZones.map(zone => (
+              <Polygon
+                key={zone.id}
+                coordinates={zone.coordinates}
+                strokeColor="rgba(14,165,233,0.7)"
+                fillColor="rgba(14,165,233,0.12)"
+                strokeWidth={2}
+              />
+            ))}
+
+            {parkingZones.map(zone => (
+              <Polygon
+                key={zone.id}
+                coordinates={zone.coordinates}
+                strokeColor="rgba(34,197,94,0.9)"
+                fillColor="rgba(34,197,94,0.18)"
+                strokeWidth={2}
+              />
+            ))}
+
             {scooters.map((scooter, index) => {
               const latitude = scooter.coordinates?.latitude;
               const longitude = scooter.coordinates?.longitude;
@@ -128,6 +182,34 @@ export const MapScreen = () => {
               </TouchableOpacity>
             )
           )}
+
+          <View style={styles.legendContainer} testID="zone-legend">
+            <View style={styles.legendRow}>
+              <View style={[styles.legendSwatch, styles.allowedSwatch]} />
+              <Text style={styles.legendLabel}>Tillåten zon</Text>
+            </View>
+            <View style={styles.legendRow}>
+              <View style={[styles.legendSwatch, styles.parkingSwatch]} />
+              <Text style={styles.legendLabel}>Parkeringszon</Text>
+            </View>
+          </View>
+
+          <View style={styles.zoomControls} testID="zoom-controls">
+            <TouchableOpacity
+              style={styles.zoomButton}
+              onPress={handleZoomIn}
+              testID="zoom-in-button"
+            >
+              <Text style={styles.zoomLabel}>+</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.zoomButton}
+              onPress={handleZoomOut}
+              testID="zoom-out-button"
+            >
+              <Text style={styles.zoomLabel}>-</Text>
+            </TouchableOpacity>
+          </View>
 
           {selectedScooter && (
             <View style={styles.bottomSheet}>
@@ -282,5 +364,61 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  legendContainer: {
+    position: 'absolute',
+    top: 24,
+    left: 16,
+    backgroundColor: 'rgba(17, 24, 39, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+  },
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legendSwatch: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 2,
+  },
+  legendLabel: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  allowedSwatch: {
+    backgroundColor: 'rgba(14,165,233,0.12)',
+    borderColor: 'rgba(14,165,233,0.9)',
+  },
+  parkingSwatch: {
+    backgroundColor: 'rgba(34,197,94,0.18)',
+    borderColor: 'rgba(34,197,94,0.9)',
+  },
+  zoomControls: {
+    position: 'absolute',
+    bottom: 140,
+    right: 20,
+    backgroundColor: 'rgba(17, 24, 39, 0.85)',
+    borderRadius: 12,
+    padding: 8,
+    gap: 8,
+  },
+  zoomButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  zoomLabel: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '700',
   },
 });

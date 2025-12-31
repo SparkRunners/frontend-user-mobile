@@ -65,15 +65,20 @@ jest.mock('react-native-safe-area-context', () => {
 jest.mock('react-native-maps', () => {
   const React = require('react');
   const { View } = require('react-native');
-  const MockMapView = (props) => {
+  const MockMapView = React.forwardRef((props, ref) => {
+    React.useImperativeHandle(ref, () => ({
+      animateToRegion: jest.fn(),
+    }));
     return React.createElement(View, { ...props }, props.children);
-  };
+  });
   const MockMarker = (props) => React.createElement(View, { ...props }, props.children);
+  const MockPolygon = (props) => React.createElement(View, { ...props }, props.children);
   
   return {
     __esModule: true,
     default: MockMapView,
     Marker: MockMarker,
+    Polygon: MockPolygon,
     PROVIDER_DEFAULT: 'default',
     PROVIDER_GOOGLE: 'google',
   };
