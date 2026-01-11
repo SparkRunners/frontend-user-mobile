@@ -1,13 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { MapScreen } from '../MapScreen';
-import { fetchScooters, unlockScooter } from '../../scooters/api';
-
-// Mock the API
-jest.mock('../../scooters/api', () => ({
-  fetchScooters: jest.fn(),
-  unlockScooter: jest.fn(),
-}));
 
 // Mock Ride feature
 const mockStartRide = jest.fn();
@@ -73,15 +66,37 @@ const MOCK_API_SCOOTERS = [
   },
 ];
 
+type MockScootersFeedState = {
+  scooters: typeof MOCK_API_SCOOTERS;
+  isLoading: boolean;
+  error: string | null;
+  refetch: jest.Mock;
+};
+
+const createFeedState = (overrides: Partial<MockScootersFeedState> = {}): MockScootersFeedState => ({
+  scooters: MOCK_API_SCOOTERS,
+  isLoading: false,
+  error: null,
+  refetch: jest.fn(),
+  ...overrides,
+});
+
+const mockUseScootersFeed = jest.fn<MockScootersFeedState, []>();
+
+jest.mock('../../scooters/useScootersFeed', () => ({
+  useScootersFeed: () => mockUseScootersFeed(),
+}));
+
 describe('MapScreen', () => {
   beforeEach(() => {
-    (fetchScooters as jest.Mock).mockResolvedValue(MOCK_API_SCOOTERS);
+    jest.clearAllMocks();
+    mockUseScootersFeed.mockReturnValue(createFeedState());
+    mockStartRide.mockReset();
   });
 
   it('renders the map with correct initial region', async () => {
     const { getByTestId } = render(<MapScreen />);
     expect(getByTestId('map-view')).toBeTruthy();
-    await waitFor(() => expect(fetchScooters).toHaveBeenCalled());
   });
 
   it('renders zone legend and zoom controls', () => {
@@ -94,10 +109,8 @@ describe('MapScreen', () => {
   it('renders markers for all scooters', async () => {
     const { getByTestId } = render(<MapScreen />);
     
-    await waitFor(() => {
-      MOCK_API_SCOOTERS.forEach(scooter => {
-        expect(getByTestId(`marker-${scooter.id}`)).toBeTruthy();
-      });
+    MOCK_API_SCOOTERS.forEach(scooter => {
+      expect(getByTestId(`marker-${scooter.id}`)).toBeTruthy();
     });
   });
 
@@ -126,9 +139,6 @@ describe('MapScreen', () => {
   it('opens scanner and unlocks scooter', async () => {
     const { getByText, getByTestId } = render(<MapScreen />);
     
-    // Wait for scooters to load so the scan button appears (it appears when no scooter is selected)
-    await waitFor(() => expect(fetchScooters).toHaveBeenCalled());
-    
     // Find and press scan button
     const scanButton = getByText('Skanna');
     fireEvent.press(scanButton);
@@ -144,6 +154,31 @@ describe('MapScreen', () => {
     await waitFor(() => {
       expect(mockStartRide).toHaveBeenCalledWith('3124');
     });
+  });
+
+  it('shows loading state before scooters arrive', () => {
+    mockUseScootersFeed.mockReturnValue(
+      createFeedState({ scooters: [], isLoading: true })
+    );
+
+    const { getByTestId, getByText } = render(<MapScreen />);
+
+    expect(getByTestId('scooter-feed-loading')).toBeTruthy();
+    expect(getByText('Hämtar...')).toBeTruthy();
+    expect(getByTestId('scan-button').props.accessibilityState?.disabled).toBe(true);
+  });
+
+  it('renders error banner and retries the feed', () => {
+    const refetch = jest.fn();
+    mockUseScootersFeed.mockReturnValue(
+      createFeedState({ error: 'Nätverksfel', refetch })
+    );
+
+    const { getByTestId, getByText } = render(<MapScreen />);
+
+    expect(getByText('Nätverksfel')).toBeTruthy();
+    fireEvent.press(getByTestId('scooter-feed-error'));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
 

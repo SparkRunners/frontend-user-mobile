@@ -1,82 +1,98 @@
+import { scooterApiClient } from '../../api/httpClient';
 import { Ride } from './types';
 
-// Mock delay helper
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const RENT_BASE_PATH = '/api/v1/rent';
 
-const mockHistory: Ride[] = [
-  {
-    id: 'ride_001',
-    scooterId: 'SCOOT-102',
-    userId: 'user_123',
-    startTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1 - 1000 * 60 * 18).toISOString(),
-    endTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
-    status: 'completed',
-    cost: 46,
-    durationSeconds: 1080,
-  },
-  {
-    id: 'ride_002',
-    scooterId: 'SCOOT-224',
-    userId: 'user_123',
-    startTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3 - 1000 * 60 * 25).toISOString(),
-    endTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 3).toISOString(),
-    status: 'completed',
-    cost: 52,
-    durationSeconds: 1200,
-  },
-  {
-    id: 'ride_003',
-    scooterId: 'SCOOT-310',
-    userId: 'user_123',
-    startTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7 - 1000 * 60 * 12).toISOString(),
-    endTime: new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString(),
-    status: 'completed',
-    cost: 38,
-    durationSeconds: 780,
-  },
-];
+type RentTripDto = {
+  id?: string;
+  tripId?: string;
+  scooterId?: string;
+  vehicleId?: string;
+  userId?: string;
+  riderId?: string;
+  startTime?: string;
+  startedAt?: string;
+  endTime?: string | null;
+  completedAt?: string | null;
+  status?: string;
+  cost?: number;
+  totalCost?: number;
+  durationSeconds?: number;
+  elapsedSeconds?: number;
+};
+
+const ensureValue = (value: string | undefined, fallback: string | undefined, label: string) => {
+  const resolved = value ?? fallback;
+  if (!resolved) {
+    throw new Error(`Ride payload missing required field: ${label}`);
+  }
+  return resolved;
+};
+
+const resolveStatus = (payload: RentTripDto): Ride['status'] => {
+  const normalized = payload.status?.toLowerCase();
+  if (normalized === 'active' || normalized === 'completed' || normalized === 'cancelled') {
+    return normalized;
+  }
+  return payload.endTime || payload.completedAt ? 'completed' : 'active';
+};
+
+const mapToRide = (payload: RentTripDto): Ride => {
+  if (!payload) {
+    throw new Error('Ride payload is empty');
+  }
+
+  const id = ensureValue(payload.id, payload.tripId, 'id');
+  const scooterId = ensureValue(payload.scooterId, payload.vehicleId, 'scooterId');
+  const userId = ensureValue(payload.userId, payload.riderId, 'userId');
+
+  const startTime = payload.startTime ?? payload.startedAt ?? new Date().toISOString();
+  const endTime = payload.endTime ?? payload.completedAt ?? undefined;
+
+  return {
+    id,
+    scooterId,
+    userId,
+    startTime,
+    endTime: endTime ?? undefined,
+    status: resolveStatus(payload),
+    cost: payload.cost ?? payload.totalCost ?? 0,
+    durationSeconds: payload.durationSeconds ?? payload.elapsedSeconds ?? 0,
+  };
+};
+
+const encodeId = (value: string) => encodeURIComponent(value);
 
 export const rideApi = {
   startRide: async (scooterId: string): Promise<Ride> => {
-    await delay(1000);
-    return {
-      id: `ride_${Date.now()}`,
-      scooterId,
-      userId: 'user_123', // Mock user ID
-      startTime: new Date().toISOString(),
-      status: 'active',
-      cost: 10, // Unlock fee
-      durationSeconds: 0,
-    };
+    const response = await scooterApiClient.post<RentTripDto>(
+      `${RENT_BASE_PATH}/start/${encodeId(scooterId)}`,
+    );
+    return mapToRide(response.data);
   },
 
   endRide: async (rideId: string): Promise<Ride> => {
-    await delay(1000);
-    // Mock calculation: 10kr base + 2.5kr/min * 15 min = 47.5kr
-    const durationSeconds = 900; // 15 mins
-    const cost = 10 + (2.5 * (durationSeconds / 60));
-    
-    return {
-      id: rideId,
-      scooterId: 'scooter_123',
-      userId: 'user_123',
-      startTime: new Date(Date.now() - durationSeconds * 1000).toISOString(),
-      endTime: new Date().toISOString(),
-      status: 'completed',
-      cost,
-      durationSeconds,
-    };
+    const response = await scooterApiClient.post<RentTripDto>(
+      `${RENT_BASE_PATH}/stop/${encodeId(rideId)}`,
+    );
+    return mapToRide(response.data);
   },
 
   getCurrentRide: async (): Promise<Ride | null> => {
-    await delay(500);
-    // Return null to simulate no active ride initially
-    return null;
+    try {
+      const response = await scooterApiClient.get<RentTripDto[]>(`${RENT_BASE_PATH}/history`, {
+        params: { status: 'active', limit: 1 },
+      });
+      const active = response.data.find(trip => resolveStatus(trip) === 'active');
+      return active ? mapToRide(active) : null;
+    } catch (error) {
+      console.warn('rideApi.getCurrentRide is unavailable on this backend version', error);
+      return null;
+    }
   },
 
   getRideHistory: async (): Promise<Ride[]> => {
-    await delay(800);
-    // Return a shallow copy so downstream consumers can safely mutate
-    return mockHistory.map(ride => ({ ...ride }));
-  }
+    const response = await scooterApiClient.get<RentTripDto[]>(`${RENT_BASE_PATH}/history`);
+    return response.data.map(trip => mapToRide(trip));
+  },
 };
