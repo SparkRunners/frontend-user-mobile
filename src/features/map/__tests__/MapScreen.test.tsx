@@ -48,7 +48,7 @@ jest.mock('../../pricing/usePricing', () => ({
 
 const MOCK_API_SCOOTERS = [
   {
-    id: 3124,
+    id: '3124',
     name: 'Scooter 3124',
     city: 'Stockholm',
     coordinates: { latitude: 59.3293, longitude: 18.0686 },
@@ -57,7 +57,7 @@ const MOCK_API_SCOOTERS = [
     speed: 0,
   },
   {
-    id: 3125,
+    id: '3125',
     name: 'Scooter 3125',
     city: 'Stockholm',
     coordinates: { latitude: 59.3325, longitude: 18.0650 },

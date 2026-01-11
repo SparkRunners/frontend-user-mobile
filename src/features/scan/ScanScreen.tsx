@@ -6,9 +6,10 @@ import { theme } from '../../theme';
 interface ScanScreenProps {
   onClose: () => void;
   onScanSuccess: (code: string) => void;
+  devMockCode?: string | null;
 }
 
-export const ScanScreen = ({ onClose, onScanSuccess }: ScanScreenProps) => {
+export const ScanScreen = ({ onClose, onScanSuccess, devMockCode }: ScanScreenProps) => {
   const [isScanning, setIsScanning] = useState(true);
 
   const onReadCode = (event: any) => {
@@ -46,14 +47,14 @@ export const ScanScreen = ({ onClose, onScanSuccess }: ScanScreenProps) => {
         </Text>
         
         {/* Dev Helper: Simulate Scan */}
-        {__DEV__ && (
+        {__DEV__ && devMockCode ? (
           <TouchableOpacity
             style={styles.devButton}
-            onPress={() => onScanSuccess('123456')}
+            onPress={() => onScanSuccess(devMockCode)}
           >
             <Text style={styles.devButtonText}>[DEV] Simulera Skanning</Text>
           </TouchableOpacity>
-        )}
+        ) : null}
       </View>
     </View>
   );

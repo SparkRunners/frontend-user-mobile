@@ -95,9 +95,47 @@ export const MapScreen = () => {
     error: scootersError,
     refetch: refetchScooters,
   } = useScootersFeed();
-  const hasScootersAvailable = scooters.length > 0;
+
+  const normalizeStatus = useCallback((status?: string | null) => status?.toLowerCase().trim() ?? '', []);
+  const availableScooters = useMemo(
+    () => scooters.filter(scooter => normalizeStatus(scooter.status) === 'available'),
+    [scooters, normalizeStatus],
+  );
+
+  const hasScootersAvailable = availableScooters.length > 0;
   const shouldShowInitialLoader = scootersLoading && !hasScootersAvailable && !scootersError;
   const isScanDisabled = scootersLoading && !hasScootersAvailable;
+
+  useEffect(() => {
+    if (selectedScooter && !availableScooters.some(scooter => scooter.id === selectedScooter.id)) {
+      setSelectedScooter(null);
+    }
+  }, [availableScooters, selectedScooter]);
+
+  const resolveScooter = useCallback(
+    (code: string): Scooter | null => {
+      const normalized = code?.trim();
+      if (!normalized) {
+        return null;
+      }
+
+      const byId = scooters.find(scooter => scooter.id === normalized);
+      if (byId) {
+        return byId;
+      }
+
+      const normalizedLower = normalized.toLowerCase();
+      const byName = scooters.find(
+        scooter => scooter.name?.toLowerCase() === normalizedLower,
+      );
+      if (byName) {
+        return byName;
+      }
+
+      return null;
+    },
+    [scooters],
+  );
 
   useEffect(() => {
     const nextRegion = CITY_REGIONS[selectedCity] ?? STOCKHOLM_REGION;
@@ -116,10 +154,23 @@ export const MapScreen = () => {
 
   const handleScanSuccess = async (code: string) => {
     setShowScanner(false);
-    
-    // Parse scooter ID from code (assuming code is the ID for now)
-    // In a real app, we might validate the format
-    const scooterId = code;
+
+    const scooter = resolveScooter(code);
+
+    if (!scooter) {
+      Alert.alert(
+        'Fel',
+        'QR-koden matchade ingen scooter. Kontrollera att koden tillhör en aktiv skoter och försök igen.',
+      );
+      return;
+    }
+
+    if (normalizeStatus(scooter.status) !== 'available') {
+      Alert.alert('Fel', 'Denna skoter är inte tillgänglig för uthyrning just nu. Välj en annan skoter.');
+      return;
+    }
+
+    const scooterId = scooter.id;
 
     try {
       Toast.show({
@@ -172,6 +223,7 @@ export const MapScreen = () => {
         <ScanScreen
           onClose={() => setShowScanner(false)}
           onScanSuccess={handleScanSuccess}
+          devMockCode={selectedScooter?.id ?? availableScooters[0]?.id ?? null}
         />
       ) : (
         <>
@@ -217,7 +269,7 @@ export const MapScreen = () => {
               </Marker>
             ))}
 
-            {scooters.map((scooter, index) => {
+            {availableScooters.map((scooter, index) => {
               const latitude = scooter.coordinates?.latitude;
               const longitude = scooter.coordinates?.longitude;
 

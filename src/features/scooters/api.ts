@@ -6,7 +6,7 @@ export interface ScooterCoordinates {
 }
 
 export interface Scooter {
-  id: number;
+  id: string;
   name: string;
   city: string;
   status: string;
@@ -20,11 +20,33 @@ export interface FetchScootersParams {
   status?: string;
 }
 
+type ScooterApiPayload = Omit<Scooter, 'id'> & {
+  id?: string | number;
+  _id?: string;
+  scooterId?: string | number;
+};
+
+const normalizeScooterId = (payload: ScooterApiPayload): string => {
+  const raw = payload.id ?? payload._id ?? payload.scooterId;
+  if (typeof raw === 'string' && raw.trim().length > 0) {
+    return raw;
+  }
+  if (typeof raw === 'number') {
+    return raw.toString();
+  }
+  return '';
+};
+
+const mapScooter = (payload: ScooterApiPayload): Scooter => ({
+  ...payload,
+  id: normalizeScooterId(payload),
+});
+
 export const fetchScooters = async (params?: FetchScootersParams) => {
-  const response = await scooterApiClient.get<Scooter[]>('/scooters', {
+  const response = await scooterApiClient.get<ScooterApiPayload[]>('/scooters', {
     params,
   });
-  return response.data;
+  return response.data.map(mapScooter);
 };
 
 export interface UnlockScooterResponse {
@@ -32,7 +54,7 @@ export interface UnlockScooterResponse {
   message: string;
 }
 
-export const unlockScooter = async (scooterId: number) => {
+export const unlockScooter = async (scooterId: string) => {
   const response = await scooterApiClient.post<UnlockScooterResponse>(
     `/scooters/${scooterId}/unlock`,
   );

@@ -39,7 +39,7 @@ describe('rideApi', () => {
   });
 
   it('starts a ride via the rent start endpoint', async () => {
-    mockPost.mockResolvedValueOnce({ data: buildTrip() });
+    mockPost.mockResolvedValueOnce({ data: { trip: buildTrip() } });
 
     const ride = await rideApi.startRide('SCOOT-900');
 
@@ -54,13 +54,13 @@ describe('rideApi', () => {
 
   it('stops a ride via the rent stop endpoint', async () => {
     mockPost.mockResolvedValueOnce({
-      data: buildTrip({
+      data: { trip: buildTrip({
         id: 'rent-xyz',
         status: 'completed',
         endTime: '2025-01-01T12:30:00.000Z',
         durationSeconds: 1800,
         cost: 52,
-      }),
+      }) },
     });
 
     const ride = await rideApi.endRide('rent-xyz');

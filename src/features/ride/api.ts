@@ -15,10 +15,14 @@ const ZONE_RULES_PATH = '/zones/check';
 type RentTripDto = {
   id?: string;
   tripId?: string;
+  _id?: string;
   scooterId?: string;
   vehicleId?: string;
+  scooter_id?: string;
+  scooterID?: string;
   userId?: string;
   riderId?: string;
+  ownerId?: string;
   startTime?: string;
   startedAt?: string;
   endTime?: string | null;
@@ -51,9 +55,21 @@ const mapToRide = (payload: RentTripDto): Ride => {
     throw new Error('Ride payload is empty');
   }
 
-  const id = ensureValue(payload.id, payload.tripId, 'id');
-  const scooterId = ensureValue(payload.scooterId, payload.vehicleId, 'scooterId');
-  const userId = ensureValue(payload.userId, payload.riderId, 'userId');
+  const id = ensureValue(
+    payload.id ?? payload.tripId ?? payload._id,
+    undefined,
+    'id',
+  );
+  const scooterId = ensureValue(
+    payload.scooterId ?? payload.vehicleId ?? payload.scooter_id ?? payload.scooterID,
+    undefined,
+    'scooterId',
+  );
+  const userId = ensureValue(
+    payload.userId ?? payload.riderId ?? payload.ownerId,
+    undefined,
+    'userId',
+  );
 
   const startTime = payload.startTime ?? payload.startedAt ?? new Date().toISOString();
   const endTime = payload.endTime ?? payload.completedAt ?? undefined;
@@ -71,6 +87,17 @@ const mapToRide = (payload: RentTripDto): Ride => {
 };
 
 const encodeId = (value: string) => encodeURIComponent(value);
+
+const unwrapTripPayload = (payload: unknown): RentTripDto => {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Ride payload is empty');
+  }
+  const record = payload as Record<string, unknown>;
+  if (record.trip && typeof record.trip === 'object') {
+    return record.trip as RentTripDto;
+  }
+  return payload as RentTripDto;
+};
 
 type GenericRecord = Record<string, unknown>;
 
@@ -263,17 +290,25 @@ const parseTripPayload = (payload: TripListPayload): { trips: RentTripDto[]; rec
 
 export const rideApi = {
   startRide: async (scooterId: string): Promise<Ride> => {
-    const response = await scooterApiClient.post<RentTripDto>(
-      `${RENT_BASE_PATH}/start/${encodeId(scooterId)}`,
-    );
-    return mapToRide(response.data);
+    try {
+      const response = await scooterApiClient.post<RentTripDto>(
+        `${RENT_BASE_PATH}/start/${encodeId(scooterId)}`,
+      );
+      return mapToRide(unwrapTripPayload(response.data));
+    } catch (error) {
+      if (__DEV__) {
+        const response = (error as { response?: { status?: number; data?: unknown } }).response;
+        console.warn('[rideApi] startRide failed', response?.status, response?.data);
+      }
+      throw error;
+    }
   },
 
   endRide: async (rideId: string): Promise<Ride> => {
     const response = await scooterApiClient.post<RentTripDto>(
       `${RENT_BASE_PATH}/stop/${encodeId(rideId)}`,
     );
-    return mapToRide(response.data);
+    return mapToRide(unwrapTripPayload(response.data));
   },
 
   getCurrentRide: async (): Promise<Ride | null> => {
