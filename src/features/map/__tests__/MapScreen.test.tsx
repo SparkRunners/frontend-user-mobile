@@ -1,13 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { MapScreen } from '../MapScreen';
-import { fetchScooters, unlockScooter } from '../../scooters/api';
-
-// Mock the API
-jest.mock('../../scooters/api', () => ({
-  fetchScooters: jest.fn(),
-  unlockScooter: jest.fn(),
-}));
 
 // Mock Ride feature
 const mockStartRide = jest.fn();
@@ -73,18 +66,32 @@ const MOCK_API_SCOOTERS = [
   },
 ];
 
+type MockScootersFeedState = {
+  scooters: typeof MOCK_API_SCOOTERS;
+  isLoading: boolean;
+  error: string | null;
+  refetch: jest.Mock;
+};
+
+const createFeedState = (overrides: Partial<MockScootersFeedState> = {}): MockScootersFeedState => ({
+  scooters: MOCK_API_SCOOTERS,
+  isLoading: false,
+  error: null,
+  refetch: jest.fn(),
+  ...overrides,
+});
+
+const mockUseScootersFeed = jest.fn<MockScootersFeedState, []>();
+
 jest.mock('../../scooters/useScootersFeed', () => ({
-  useScootersFeed: () => ({
-    scooters: MOCK_API_SCOOTERS,
-    isLoading: false,
-    error: null,
-    refetch: jest.fn(),
-  }),
+  useScootersFeed: () => mockUseScootersFeed(),
 }));
 
 describe('MapScreen', () => {
   beforeEach(() => {
-    (fetchScooters as jest.Mock).mockResolvedValue(MOCK_API_SCOOTERS);
+    jest.clearAllMocks();
+    mockUseScootersFeed.mockReturnValue(createFeedState());
+    mockStartRide.mockReset();
   });
 
   it('renders the map with correct initial region', async () => {
@@ -147,6 +154,31 @@ describe('MapScreen', () => {
     await waitFor(() => {
       expect(mockStartRide).toHaveBeenCalledWith('3124');
     });
+  });
+
+  it('shows loading state before scooters arrive', () => {
+    mockUseScootersFeed.mockReturnValue(
+      createFeedState({ scooters: [], isLoading: true })
+    );
+
+    const { getByTestId, getByText } = render(<MapScreen />);
+
+    expect(getByTestId('scooter-feed-loading')).toBeTruthy();
+    expect(getByText('Hämtar...')).toBeTruthy();
+    expect(getByTestId('scan-button').props.accessibilityState?.disabled).toBe(true);
+  });
+
+  it('renders error banner and retries the feed', () => {
+    const refetch = jest.fn();
+    mockUseScootersFeed.mockReturnValue(
+      createFeedState({ error: 'Nätverksfel', refetch })
+    );
+
+    const { getByTestId, getByText } = render(<MapScreen />);
+
+    expect(getByText('Nätverksfel')).toBeTruthy();
+    fireEvent.press(getByTestId('scooter-feed-error'));
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
 

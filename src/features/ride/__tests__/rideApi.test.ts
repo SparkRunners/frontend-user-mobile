@@ -1,76 +1,113 @@
+import { scooterApiClient } from '../../../api/httpClient';
 import { rideApi } from '../api';
 
-describe('rideApi', () => {
-  const setTime = (value: string) => {
-    jest.setSystemTime(new Date(value));
+jest.mock('../../../api/httpClient', () => {
+  const post = jest.fn();
+  const get = jest.fn();
+  return {
+    scooterApiClient: {
+      post,
+      get,
+    },
   };
+});
+
+const mockPost = scooterApiClient.post as jest.Mock;
+const mockGet = scooterApiClient.get as jest.Mock;
+
+describe('rideApi', () => {
+  const buildTrip = (overrides: Record<string, unknown> = {}) => ({
+    id: 'rent-001',
+    scooterId: 'SCOOT-900',
+    userId: 'user-123',
+    startTime: '2025-01-01T12:00:00.000Z',
+    status: 'active',
+    cost: 10,
+    durationSeconds: 0,
+    ...overrides,
+  });
+
+  let warnSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    jest.useFakeTimers({ legacyFakeTimers: false });
-    setTime('2025-01-01T12:00:00.000Z');
+    jest.clearAllMocks();
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    jest.useRealTimers();
-    jest.clearAllMocks();
+    warnSpy?.mockRestore();
   });
 
-  it('starts a ride with default pricing', async () => {
-    const promise = rideApi.startRide('SCOOT-900');
+  it('starts a ride via the rent start endpoint', async () => {
+    mockPost.mockResolvedValueOnce({ data: buildTrip() });
 
-    jest.advanceTimersByTime(1000);
-    const expectedTimestamp = Date.now();
-    const ride = await promise;
+    const ride = await rideApi.startRide('SCOOT-900');
 
+    expect(mockPost).toHaveBeenCalledWith('/api/v1/rent/start/SCOOT-900');
     expect(ride).toMatchObject({
+      id: 'rent-001',
       scooterId: 'SCOOT-900',
       status: 'active',
       cost: 10,
-      durationSeconds: 0,
     });
-    expect(new Date(ride.startTime).getTime()).toBe(expectedTimestamp);
   });
 
-  it('completes a ride and reports backend cost', async () => {
-    const promise = rideApi.endRide('ride-abc');
+  it('stops a ride via the rent stop endpoint', async () => {
+    mockPost.mockResolvedValueOnce({
+      data: buildTrip({
+        id: 'rent-xyz',
+        status: 'completed',
+        endTime: '2025-01-01T12:30:00.000Z',
+        durationSeconds: 1800,
+        cost: 52,
+      }),
+    });
 
-    jest.advanceTimersByTime(1000);
-    const completionTimestamp = Date.now();
-    const ride = await promise;
+    const ride = await rideApi.endRide('rent-xyz');
 
+    expect(mockPost).toHaveBeenCalledWith('/api/v1/rent/stop/rent-xyz');
     expect(ride).toMatchObject({
-      id: 'ride-abc',
+      id: 'rent-xyz',
       status: 'completed',
-      durationSeconds: 900,
-      cost: 47.5,
+      durationSeconds: 1800,
+      cost: 52,
+      endTime: '2025-01-01T12:30:00.000Z',
     });
-    expect(new Date(ride.endTime).getTime()).toBe(completionTimestamp);
-    expect(new Date(ride.startTime).getTime()).toBe(completionTimestamp - ride.durationSeconds * 1000);
-  });
-
-  it('reports no current ride by default', async () => {
-    const promise = rideApi.getCurrentRide();
-    jest.advanceTimersByTime(500);
-
-    await expect(promise).resolves.toBeNull();
   });
 
   it('returns copies of the ride history data', async () => {
-    const firstPromise = rideApi.getRideHistory();
-    jest.advanceTimersByTime(800);
-    const firstHistory = await firstPromise;
+    const trip = buildTrip({ id: 'rent-h1', cost: 46 });
+    mockGet
+      .mockResolvedValueOnce({ data: [trip] })
+      .mockResolvedValueOnce({ data: [trip] });
 
-    expect(firstHistory).toHaveLength(3);
-    expect(firstHistory[0].id).toBe('ride_001');
-
+    const firstHistory = await rideApi.getRideHistory();
     firstHistory[0].cost = 0;
 
-    const secondPromise = rideApi.getRideHistory();
-    jest.advanceTimersByTime(800);
-    const secondHistory = await secondPromise;
+    const secondHistory = await rideApi.getRideHistory();
 
-    expect(secondHistory[0].id).toBe('ride_001');
+    expect(mockGet).toHaveBeenCalledWith('/api/v1/rent/history');
+    expect(firstHistory[0]).not.toBe(secondHistory[0]);
     expect(secondHistory[0].cost).toBe(46);
-    expect(secondHistory[0]).not.toBe(firstHistory[0]);
+  });
+
+  it('returns the active ride when available', async () => {
+    mockGet.mockResolvedValueOnce({ data: [buildTrip()] });
+
+    const ride = await rideApi.getCurrentRide();
+
+    expect(mockGet).toHaveBeenCalledWith('/api/v1/rent/history', {
+      params: { status: 'active', limit: 1 },
+    });
+    expect(ride?.status).toBe('active');
+  });
+
+  it('falls back to null when backend has no active ride data', async () => {
+    mockGet
+      .mockResolvedValueOnce({ data: [buildTrip({ status: 'completed', endTime: '2025-01-01T12:05:00.000Z' })] })
+      .mockRejectedValueOnce(new Error('not supported'));
+
+    await expect(rideApi.getCurrentRide()).resolves.toBeNull();
+    await expect(rideApi.getCurrentRide()).resolves.toBeNull();
   });
 });

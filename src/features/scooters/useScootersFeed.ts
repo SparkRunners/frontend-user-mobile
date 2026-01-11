@@ -14,18 +14,38 @@ export const useScootersFeed = (options?: ScootersFeedOptions) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
 
   const load = useCallback(async () => {
+    if (!isMountedRef.current) {
+      return;
+    }
+
+    setIsLoading(true);
     setError(null);
+
     try {
       const data = await fetchScooters();
+      if (!isMountedRef.current) {
+        return;
+      }
       setScooters(data);
     } catch (err) {
       console.error('Failed to fetch scooters:', err);
-      setError('Kunde inte hämta scooters. Försök igen.');
+      if (isMountedRef.current) {
+        setError('Kunde inte hämta scooters. Försök igen.');
+      }
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) {
+        setIsLoading(false);
+      }
     }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
   }, []);
 
   useEffect(() => {

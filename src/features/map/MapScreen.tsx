@@ -46,6 +46,9 @@ export const MapScreen = () => {
     error: scootersError,
     refetch: refetchScooters,
   } = useScootersFeed();
+  const hasScootersAvailable = scooters.length > 0;
+  const shouldShowInitialLoader = scootersLoading && !hasScootersAvailable && !scootersError;
+  const isScanDisabled = scootersLoading && !hasScootersAvailable;
 
   const handleScanSuccess = async (code: string) => {
     setShowScanner(false);
@@ -180,13 +183,28 @@ export const MapScreen = () => {
           ) : (
             !selectedScooter && (
               <TouchableOpacity
-                style={styles.scanButton}
+                testID="scan-button"
+                style={[
+                  styles.scanButton,
+                  isScanDisabled && styles.scanButtonDisabled,
+                ]}
                 onPress={() => setShowScanner(true)}
+                disabled={isScanDisabled}
+                accessibilityState={{ disabled: isScanDisabled }}
               >
-                <Text style={styles.scanButtonText}>Skanna</Text>
+                <Text style={styles.scanButtonText}>
+                  {isScanDisabled ? 'Hämtar...' : 'Skanna'}
+                </Text>
               </TouchableOpacity>
             )
           )}
+
+          {shouldShowInitialLoader ? (
+            <View style={styles.feedLoadingContainer} testID="scooter-feed-loading">
+              <ActivityIndicator color={theme.colors.brand} size="small" />
+              <Text style={styles.feedLoadingText}>Hämtar skotrar...</Text>
+            </View>
+          ) : null}
 
           {scootersError ? (
             <TouchableOpacity
@@ -369,102 +387,120 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: '#E5E7EB',
     borderRadius: 2,
-    pricingCard: {
-      backgroundColor: theme.colors.background,
-      borderRadius: 16,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      marginBottom: 20,
-      gap: 12,
-    },
-    pricingHeaderRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    pricingTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: theme.colors.text,
-    },
-    pricingUpdated: {
-      fontSize: 11,
-      color: theme.colors.textMuted,
-    },
-    pricingValues: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    pricingValueCol: {
-      flex: 1,
-    },
-    pricingLabel: {
-      fontSize: 13,
-      color: theme.colors.textMuted,
-      marginBottom: 4,
-    },
-    pricingValue: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: theme.colors.text,
-    },
-    pricingDivider: {
-      width: 1,
-      height: '100%',
-      backgroundColor: theme.colors.border,
-      marginHorizontal: 12,
-    },
-    pricingNote: {
-      fontSize: 12,
-      color: theme.colors.textMuted,
-      lineHeight: 16,
-    },
-    pricingLoadingRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    pricingLoadingText: {
-      color: theme.colors.text,
-    },
-    pricingErrorContainer: {
-      backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.08)',
-      padding: 12,
-      borderRadius: 12,
-    },
-    pricingErrorText: {
-      color: theme.colors.danger,
-      fontWeight: '600',
-    },
-    pricingRetryText: {
-      color: theme.colors.text,
-      fontSize: 12,
-      marginTop: 4,
-    },
-    feedErrorBanner: {
-      position: 'absolute',
-      bottom: 110,
-      left: 20,
-      right: 20,
-      backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.15)',
-      borderRadius: 12,
-      padding: 12,
-      borderWidth: 1,
-      borderColor: theme.colors.danger,
-    },
-    feedErrorText: {
-      color: theme.colors.danger,
-      fontWeight: '600',
-    },
-    feedRetryText: {
-      color: theme.colors.text,
-      fontSize: 12,
-      marginTop: 4,
-    },
     alignSelf: 'center',
     marginBottom: 16,
+  },
+  pricingCard: {
+    backgroundColor: theme.colors.background,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    marginBottom: 20,
+    gap: 12,
+  },
+  pricingHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pricingTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  pricingUpdated: {
+    fontSize: 11,
+    color: theme.colors.textMuted,
+  },
+  pricingValues: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pricingValueCol: {
+    flex: 1,
+  },
+  pricingLabel: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    marginBottom: 4,
+  },
+  pricingValue: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  pricingDivider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: theme.colors.border,
+    marginHorizontal: 12,
+  },
+  pricingNote: {
+    fontSize: 12,
+    color: theme.colors.textMuted,
+    lineHeight: 16,
+  },
+  pricingLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pricingLoadingText: {
+    color: theme.colors.text,
+  },
+  pricingErrorContainer: {
+    backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.08)',
+    padding: 12,
+    borderRadius: 12,
+  },
+  pricingErrorText: {
+    color: theme.colors.danger,
+    fontWeight: '600',
+  },
+  pricingRetryText: {
+    color: theme.colors.text,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  feedErrorBanner: {
+    position: 'absolute',
+    bottom: 110,
+    left: 20,
+    right: 20,
+    backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.15)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+  },
+  feedErrorText: {
+    color: theme.colors.danger,
+    fontWeight: '600',
+  },
+  feedRetryText: {
+    color: theme.colors.text,
+    fontSize: 12,
+    marginTop: 4,
+  },
+  feedLoadingContainer: {
+    position: 'absolute',
+    bottom: 110,
+    left: 20,
+    right: 20,
+    backgroundColor: theme.colors.background,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  feedLoadingText: {
+    color: theme.colors.text,
+    fontWeight: '600',
   },
   scooterId: {
     fontSize: 18,
@@ -517,6 +553,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  scanButtonDisabled: {
+    backgroundColor: theme.colors.border,
   },
   scanButtonText: {
     color: 'white',
