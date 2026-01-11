@@ -1,10 +1,19 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRide } from './RideProvider';
+import { useRideZoneRules } from './useZoneRules';
 import { theme } from '../../theme';
 
 export const RideDashboard = () => {
-  const { durationSeconds, currentCost, endRide, isLoading } = useRide();
+  const { durationSeconds, currentCost, endRide, isLoading, isRiding } = useRide();
+  const {
+    rule: zoneRule,
+    nearestParking,
+    isChecking,
+    error: zoneError,
+    lastUpdated,
+    forceRefresh,
+  } = useRideZoneRules(Boolean(isRiding));
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -12,10 +21,75 @@ export const RideDashboard = () => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const zoneSeverity = zoneRule?.type === 'no-go'
+    ? 'danger'
+    : zoneRule?.type === 'slow-speed'
+      ? 'warning'
+      : 'neutral';
+
+  const zoneTitle = zoneRule?.type === 'no-go'
+    ? 'Förbjuden zon'
+    : zoneRule?.type === 'slow-speed'
+      ? 'Låg hastighet'
+      : 'Zonstatus';
+
+  const zoneMessage = (() => {
+    if (zoneError) {
+      return zoneError;
+    }
+    if (!zoneRule) {
+      return 'Inga aktiva zonbegränsningar just nu.';
+    }
+    if (zoneRule.message) {
+      return zoneRule.message;
+    }
+    if (zoneRule.type === 'no-go') {
+      return 'Du är i en förbjuden zon. Flytta skotern innan du avslutar resan.';
+    }
+    if (zoneRule.type === 'slow-speed') {
+      return 'Du är i en låg-hastighetszon.';
+    }
+    return 'Zonstatus uppdaterad.';
+  })();
+
+  const speedLimitLabel = zoneRule?.type === 'slow-speed' && zoneRule.speedLimitKmh
+    ? `Max ${zoneRule.speedLimitKmh} km/h`
+    : null;
+
+  const parkingLabel = nearestParking
+    ? `Närmaste parkering: ${nearestParking.name ?? nearestParking.id}${nearestParking.distanceMeters ? ` · ${Math.round(nearestParking.distanceMeters)} m` : ''}`
+    : null;
+
+  const lastUpdatedLabel = lastUpdated
+    ? `Uppdaterad ${new Date(lastUpdated).toLocaleTimeString('sv-SE', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })}`
+    : null;
+
+  const buildAlertMessage = () => {
+    const rows = ['Är du säker på att du vill avsluta resan?'];
+    if (zoneRule?.type === 'no-go') {
+      rows.push('Du befinner dig i en förbjuden zon. Flytta skotern tillåten plats innan avslut.');
+    } else if (zoneRule?.type === 'slow-speed') {
+      rows.push('Du är i en låg-hastighetszon. Se till att följa begränsningen.');
+    }
+    if (nearestParking) {
+      const label = nearestParking.name ?? nearestParking.id;
+      const distance = nearestParking.distanceMeters
+        ? `${Math.round(nearestParking.distanceMeters)} m`
+        : undefined;
+      rows.push(
+        `Närmaste rekommenderade parkering: ${label}${distance ? ` (${distance})` : ''}`,
+      );
+    }
+    return rows.join('\n\n');
+  };
+
   const handleEndRide = () => {
     Alert.alert(
       'Avsluta resa',
-      'Är du säker på att du vill avsluta resan?',
+      buildAlertMessage(),
       [
         { text: 'Avbryt', style: 'cancel' },
         { 
@@ -35,6 +109,37 @@ export const RideDashboard = () => {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        style={[
+          styles.zoneBanner,
+          zoneSeverity === 'danger' && styles.zoneBannerDanger,
+          zoneSeverity === 'warning' && styles.zoneBannerWarning,
+          zoneSeverity === 'neutral' && styles.zoneBannerNeutral,
+        ]}
+        onPress={forceRefresh}
+        activeOpacity={0.9}
+        accessibilityRole="button"
+      >
+        <View style={styles.zoneBannerHeader}>
+          <Text style={styles.zoneBannerTitle}>{zoneTitle}</Text>
+          {isChecking ? (
+            <ActivityIndicator size="small" color={theme.colors.text} />
+          ) : lastUpdatedLabel ? (
+            <Text style={styles.zoneBannerMeta}>{lastUpdatedLabel}</Text>
+          ) : null}
+        </View>
+        <Text style={styles.zoneBannerMessage}>{zoneMessage}</Text>
+        {speedLimitLabel ? (
+          <Text style={styles.zoneBannerDetail}>{speedLimitLabel}</Text>
+        ) : null}
+        {parkingLabel ? (
+          <Text style={styles.zoneBannerDetail}>{parkingLabel}</Text>
+        ) : null}
+        {zoneError ? (
+          <Text style={styles.zoneBannerAction}>Tryck för att uppdatera zonstatus</Text>
+        ) : null}
+      </TouchableOpacity>
+
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Text style={styles.statLabel}>Tid</Text>
@@ -70,6 +175,56 @@ const styles = StyleSheet.create({
     borderRadius: theme.radii.card,
     padding: theme.spacing.lg,
     ...theme.shadows.soft,
+  },
+  zoneBanner: {
+    borderRadius: theme.radii.card,
+    padding: theme.spacing.md,
+    marginBottom: theme.spacing.lg,
+  },
+  zoneBannerDanger: {
+    backgroundColor: '#FEE2E2',
+    borderColor: theme.colors.danger,
+    borderWidth: 1,
+  },
+  zoneBannerWarning: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FBBF24',
+    borderWidth: 1,
+  },
+  zoneBannerNeutral: {
+    backgroundColor: theme.colors.background,
+    borderColor: theme.colors.border,
+    borderWidth: 1,
+  },
+  zoneBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  zoneBannerTitle: {
+    ...theme.typography.bodyM,
+    fontWeight: '600',
+    color: theme.colors.text,
+  },
+  zoneBannerMeta: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+  },
+  zoneBannerMessage: {
+    ...theme.typography.bodyM,
+    color: theme.colors.text,
+    marginBottom: 4,
+  },
+  zoneBannerDetail: {
+    ...theme.typography.caption,
+    color: theme.colors.textMuted,
+  },
+  zoneBannerAction: {
+    ...theme.typography.caption,
+    color: theme.colors.brand,
+    marginTop: 6,
+    fontWeight: '600',
   },
   statsContainer: {
     flexDirection: 'row',
