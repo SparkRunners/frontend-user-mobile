@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker, Polygon } from 'react-native-maps';
 import { theme } from '../../theme';
@@ -9,6 +9,7 @@ import Toast from 'react-native-toast-message';
 import { useZones } from './zones/useZones';
 import { usePricing } from '../pricing/usePricing';
 import { useScootersFeed } from '../scooters/useScootersFeed';
+import type { ZoneCity } from './zones/types';
 
 const STOCKHOLM_REGION = {
   latitude: 59.3293,
@@ -17,9 +18,48 @@ const STOCKHOLM_REGION = {
   longitudeDelta: 0.0421,
 };
 
+const CITY_REGIONS: Record<ZoneCity, typeof STOCKHOLM_REGION> = {
+  Stockholm: STOCKHOLM_REGION,
+  Göteborg: {
+    latitude: 57.7089,
+    longitude: 11.9746,
+    latitudeDelta: 0.12,
+    longitudeDelta: 0.08,
+  },
+  Malmö: {
+    latitude: 55.605,
+    longitude: 13.0038,
+    latitudeDelta: 0.12,
+    longitudeDelta: 0.08,
+  },
+};
+
+const CITY_OPTIONS: ZoneCity[] = ['Stockholm', 'Göteborg', 'Malmö'];
+
 const MIN_DELTA = 0.005;
 const MAX_DELTA = 0.5;
 const ZOOM_FACTOR = 0.5;
+
+const polygonStyleByType = {
+  'parking': {
+    strokeColor: 'rgba(34,197,94,0.9)',
+    fillColor: 'rgba(34,197,94,0.2)',
+    dashPattern: [8, 6],
+    zIndexBase: 10,
+  },
+  'slow-speed': {
+    strokeColor: 'rgba(251,191,36,0.9)',
+    fillColor: 'rgba(251,191,36,0.25)',
+    dashPattern: undefined,
+    zIndexBase: 50,
+  },
+  'no-go': {
+    strokeColor: 'rgba(248,113,113,0.95)',
+    fillColor: 'rgba(248,113,113,0.35)',
+    dashPattern: undefined,
+    zIndexBase: 100,
+  },
+} as const;
 
 const formatPrice = (value: number, currency: string) => {
   const hasFraction = Math.abs(value % 1) > 0;
@@ -31,9 +71,18 @@ export const MapScreen = () => {
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [mapRegion, setMapRegion] = useState(STOCKHOLM_REGION);
+  const [selectedCity, setSelectedCity] = useState<ZoneCity>('Stockholm');
   const mapRef = useRef<MapView | null>(null);
   const { startRide, isRiding } = useRide();
-  const { allowedZones, parkingZones } = useZones();
+  const {
+    parkingZones,
+    slowSpeedZones,
+    noGoZones,
+    chargingStations,
+    isLoading: zonesLoading,
+    error: zonesError,
+    refetch: refetchZones,
+  } = useZones(selectedCity);
   const {
     pricing,
     isLoading: pricingLoading,
@@ -49,6 +98,21 @@ export const MapScreen = () => {
   const hasScootersAvailable = scooters.length > 0;
   const shouldShowInitialLoader = scootersLoading && !hasScootersAvailable && !scootersError;
   const isScanDisabled = scootersLoading && !hasScootersAvailable;
+
+  useEffect(() => {
+    const nextRegion = CITY_REGIONS[selectedCity] ?? STOCKHOLM_REGION;
+    setMapRegion(nextRegion);
+    mapRef.current?.animateToRegion(nextRegion, 300);
+  }, [selectedCity]);
+
+  const zonePolygons = useMemo(() => {
+    const merged = [
+      ...parkingZones,
+      ...slowSpeedZones,
+      ...noGoZones,
+    ];
+    return merged.sort((a, b) => a.priority - b.priority);
+  }, [parkingZones, slowSpeedZones, noGoZones]);
 
   const handleScanSuccess = async (code: string) => {
     setShowScanner(false);
@@ -123,24 +187,34 @@ export const MapScreen = () => {
             onPress={() => setSelectedScooter(null)}
             onRegionChangeComplete={region => setMapRegion(region)}
           >
-            {allowedZones.map(zone => (
-              <Polygon
-                key={zone.id}
-                coordinates={zone.coordinates}
-                strokeColor="rgba(14,165,233,0.7)"
-                fillColor="rgba(14,165,233,0.12)"
-                strokeWidth={2}
-              />
-            ))}
+            {zonePolygons.map(zone =>
+              zone.coordinatesSets.map((coordinates, idx) => {
+                const style = polygonStyleByType[zone.type];
+                return (
+                  <Polygon
+                    key={`${zone.id}-${idx}`}
+                    coordinates={coordinates}
+                    strokeColor={style.strokeColor}
+                    fillColor={style.fillColor}
+                    strokeWidth={2}
+                    zIndex={style.zIndexBase + zone.priority}
+                    lineDashPattern={style.dashPattern}
+                  />
+                );
+              }),
+            )}
 
-            {parkingZones.map(zone => (
-              <Polygon
-                key={zone.id}
-                coordinates={zone.coordinates}
-                strokeColor="rgba(34,197,94,0.9)"
-                fillColor="rgba(34,197,94,0.18)"
-                strokeWidth={2}
-              />
+              {chargingStations.map((station, index) => (
+              <Marker
+                  key={`charging-${station.id ?? `${station.coordinate.latitude}-${station.coordinate.longitude}-${index}`}`}
+                coordinate={station.coordinate}
+                tracksViewChanges={false}
+                testID={`charging-${station.id}`}
+              >
+                <View style={styles.chargingMarker}>
+                  <Text style={styles.chargingMarkerText}>⚡</Text>
+                </View>
+              </Marker>
             ))}
 
             {scooters.map((scooter, index) => {
@@ -219,14 +293,58 @@ export const MapScreen = () => {
 
           <View style={styles.legendContainer} testID="zone-legend">
             <View style={styles.legendRow}>
-              <View style={[styles.legendSwatch, styles.allowedSwatch]} />
-              <Text style={styles.legendLabel}>Tillåten zon</Text>
-            </View>
-            <View style={styles.legendRow}>
               <View style={[styles.legendSwatch, styles.parkingSwatch]} />
               <Text style={styles.legendLabel}>Parkeringszon</Text>
             </View>
+            <View style={styles.legendRow}>
+              <View style={[styles.legendSwatch, styles.chargingSwatch]} />
+              <Text style={styles.legendLabel}>Laddstation</Text>
+            </View>
+            <View style={styles.legendRow}>
+              <View style={[styles.legendSwatch, styles.slowSwatch]} />
+              <Text style={styles.legendLabel}>Låg hastighet</Text>
+            </View>
+            <View style={styles.legendRow}>
+              <View style={[styles.legendSwatch, styles.noGoSwatch]} />
+              <Text style={styles.legendLabel}>Förbjuden zon</Text>
+            </View>
           </View>
+
+          <View style={styles.citySelector} testID="city-selector">
+            {CITY_OPTIONS.map(cityOption => {
+              const isActive = cityOption === selectedCity;
+              return (
+                <TouchableOpacity
+                  key={cityOption}
+                  style={[styles.cityChip, isActive && styles.cityChipActive]}
+                  onPress={() => setSelectedCity(cityOption)}
+                  accessibilityState={{ selected: isActive }}
+                >
+                  <Text style={[styles.cityChipLabel, isActive && styles.cityChipLabelActive]}>
+                    {cityOption}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {zonesLoading ? (
+            <View style={styles.zoneStatusChip}>
+              <ActivityIndicator color={theme.colors.brand} size="small" />
+              <Text style={styles.zoneStatusText}>Uppdaterar zoner</Text>
+            </View>
+          ) : null}
+
+          {zonesError ? (
+            <TouchableOpacity
+              style={styles.zoneErrorBanner}
+              onPress={refetchZones}
+              testID="zone-feed-error"
+            >
+              <Text style={styles.zoneErrorText}>{zonesError}</Text>
+              <Text style={styles.zoneRetryText}>Tryck för att hämta zoner igen</Text>
+            </TouchableOpacity>
+          ) : null}
 
           <View style={styles.zoomControls} testID="zoom-controls">
             <TouchableOpacity
@@ -588,13 +706,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 12,
   },
-  allowedSwatch: {
-    backgroundColor: 'rgba(14,165,233,0.12)',
-    borderColor: 'rgba(14,165,233,0.9)',
-  },
   parkingSwatch: {
     backgroundColor: 'rgba(34,197,94,0.18)',
     borderColor: 'rgba(34,197,94,0.9)',
+  },
+  chargingSwatch: {
+    backgroundColor: 'rgba(59,130,246,0.25)',
+    borderColor: 'rgba(59,130,246,0.95)',
+  },
+  slowSwatch: {
+    backgroundColor: 'rgba(251,191,36,0.25)',
+    borderColor: 'rgba(251,191,36,0.95)',
+  },
+  noGoSwatch: {
+    backgroundColor: 'rgba(248,113,113,0.35)',
+    borderColor: 'rgba(248,113,113,0.95)',
   },
   zoomControls: {
     position: 'absolute',
@@ -617,5 +743,80 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 22,
     fontWeight: '700',
+  },
+  chargingMarker: {
+    backgroundColor: '#1D4ED8',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderWidth: 2,
+    borderColor: '#bfdbfe',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chargingMarkerText: {
+    color: 'white',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  citySelector: {
+    position: 'absolute',
+    top: 24,
+    right: 16,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cityChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  cityChipActive: {
+    backgroundColor: theme.colors.brand,
+  },
+  cityChipLabel: {
+    color: '#F3F4F6',
+    fontWeight: '600',
+  },
+  cityChipLabelActive: {
+    color: '#fff',
+  },
+  zoneStatusChip: {
+    position: 'absolute',
+    top: 80,
+    right: 16,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  zoneStatusText: {
+    color: theme.colors.text,
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  zoneErrorBanner: {
+    position: 'absolute',
+    top: 120,
+    right: 16,
+    left: 16,
+    backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.15)',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.danger,
+  },
+  zoneErrorText: {
+    color: theme.colors.danger,
+    fontWeight: '600',
+  },
+  zoneRetryText: {
+    color: theme.colors.text,
+    fontSize: 12,
+    marginTop: 4,
   },
 });
