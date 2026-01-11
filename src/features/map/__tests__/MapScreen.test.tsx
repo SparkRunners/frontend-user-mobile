@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { MapScreen } from '../MapScreen';
+import type { ZoneCity } from '../zones/types';
 
 // Mock Ride feature
 const mockStartRide = jest.fn();
@@ -87,10 +88,54 @@ jest.mock('../../scooters/useScootersFeed', () => ({
   useScootersFeed: () => mockUseScootersFeed(),
 }));
 
+type MockPolygonZone = {
+  id: string;
+  type: 'parking' | 'slow-speed' | 'no-go';
+  priority: number;
+  coordinatesSets: Array<Array<{ latitude: number; longitude: number }>>;
+};
+
+type MockChargingZone = {
+  id: string;
+  type: 'charging';
+  priority: number;
+  coordinate: { latitude: number; longitude: number };
+};
+
+type MockZonesState = {
+  parkingZones: MockPolygonZone[];
+  slowSpeedZones: MockPolygonZone[];
+  noGoZones: MockPolygonZone[];
+  chargingStations: MockChargingZone[];
+  isLoading: boolean;
+  error: string | null;
+  refetch: jest.Mock;
+  city: ZoneCity;
+};
+
+const createZonesState = (overrides: Partial<MockZonesState> = {}): MockZonesState => ({
+  parkingZones: [],
+  slowSpeedZones: [],
+  noGoZones: [],
+  chargingStations: [],
+  isLoading: false,
+  error: null,
+  refetch: jest.fn(),
+  city: 'Stockholm',
+  ...overrides,
+});
+
+const mockUseZones = jest.fn<MockZonesState, [ZoneCity | undefined]>();
+
+jest.mock('../zones/useZones', () => ({
+  useZones: (city?: ZoneCity) => mockUseZones(city),
+}));
+
 describe('MapScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseScootersFeed.mockReturnValue(createFeedState());
+    mockUseZones.mockReturnValue(createZonesState());
     mockStartRide.mockReset();
   });
 
@@ -178,6 +223,26 @@ describe('MapScreen', () => {
 
     expect(getByText('Nätverksfel')).toBeTruthy();
     fireEvent.press(getByTestId('scooter-feed-error'));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('allows switching cities for zone filtering', () => {
+    const { getByTestId, getByText } = render(<MapScreen />);
+    const selector = getByTestId('city-selector');
+    expect(selector).toBeTruthy();
+    fireEvent.press(getByText('Göteborg'));
+    expect(mockUseZones).toHaveBeenLastCalledWith('Göteborg');
+  });
+
+  it('shows zone error banner when loading fails', () => {
+    const refetch = jest.fn();
+    mockUseZones.mockReturnValue(
+      createZonesState({ error: 'Zonfel', refetch })
+    );
+
+    const { getByTestId, getByText } = render(<MapScreen />);
+    expect(getByText('Zonfel')).toBeTruthy();
+    fireEvent.press(getByTestId('zone-feed-error'));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
