@@ -82,7 +82,14 @@ describe('RideProvider', () => {
       await result.current.endRide();
     });
 
-    expect(rideApi.endRide).toHaveBeenCalledWith('ride_123');
+    expect(rideApi.endRide).toHaveBeenCalledWith(
+      'scooter_1',
+      expect.objectContaining({
+        id: 'ride_123',
+        scooterId: 'scooter_1',
+        status: 'completed',
+      }),
+    );
     expect(result.current.isRiding).toBe(false);
     expect(result.current.currentRide).toBeNull();
     expect(result.current.durationSeconds).toBe(0);

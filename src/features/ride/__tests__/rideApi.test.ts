@@ -1,5 +1,6 @@
 import { scooterApiClient } from '../../../api/httpClient';
 import { rideApi } from '../api';
+import type { Ride } from '../types';
 
 jest.mock('../../../api/httpClient', () => {
   const post = jest.fn();
@@ -17,13 +18,14 @@ const mockGet = scooterApiClient.get as jest.Mock;
 
 describe('rideApi', () => {
   const buildTrip = (overrides: Record<string, unknown> = {}) => ({
-    id: 'rent-001',
+    _id: 'rent-001',
     scooterId: 'SCOOT-900',
     userId: 'user-123',
     startTime: '2025-01-01T12:00:00.000Z',
+    endTime: null,
     status: 'active',
-    cost: 10,
-    durationSeconds: 0,
+    cost: '10.00 kr',
+    duration: '0 minutes',
     ...overrides,
   });
 
@@ -52,26 +54,69 @@ describe('rideApi', () => {
     });
   });
 
-  it('stops a ride via the rent stop endpoint', async () => {
+  it('stops a ride via the rent stop endpoint using scooter id', async () => {
     mockPost.mockResolvedValueOnce({
       data: { trip: buildTrip({
         id: 'rent-xyz',
         status: 'completed',
         endTime: '2025-01-01T12:30:00.000Z',
-        durationSeconds: 1800,
-        cost: 52,
+        duration: '30 minutes',
+        cost: '52.00 kr',
       }) },
     });
 
-    const ride = await rideApi.endRide('rent-xyz');
+    const ride = await rideApi.endRide('SCOOT-42');
 
-    expect(mockPost).toHaveBeenCalledWith('/rent/stop/rent-xyz');
+    expect(mockPost).toHaveBeenCalledWith('/rent/stop/SCOOT-42');
     expect(ride).toMatchObject({
       id: 'rent-xyz',
       status: 'completed',
       durationSeconds: 1800,
       cost: 52,
       endTime: '2025-01-01T12:30:00.000Z',
+    });
+  });
+
+  it('parses currency and duration strings', async () => {
+    mockPost.mockResolvedValueOnce({
+      data: {
+        trip: buildTrip({
+          id: 'rent-string',
+          cost: '45,50 kr',
+          duration: '5 minutes',
+        }),
+      },
+    });
+
+    const ride = await rideApi.endRide('SCOOT-900');
+
+    expect(ride.cost).toBeCloseTo(45.5);
+    expect(ride.durationSeconds).toBe(300);
+  });
+
+  it('falls back to local ride snapshot when stop response lacks trip data', async () => {
+    mockPost.mockResolvedValueOnce({ data: { success: true } });
+
+    const fallback: Ride = {
+      id: 'rent-empty',
+      scooterId: 'SCOOT-42',
+      userId: 'user-fallback',
+      startTime: '2025-02-01T10:00:00.000Z',
+      endTime: '2025-02-01T10:10:00.000Z',
+      status: 'completed',
+      cost: 38,
+      durationSeconds: 600,
+    };
+
+    const ride = await rideApi.endRide(fallback.scooterId, fallback);
+
+    expect(mockPost).toHaveBeenCalledWith('/rent/stop/SCOOT-42');
+    expect(ride).toMatchObject({
+      id: 'rent-empty',
+      scooterId: 'SCOOT-42',
+      cost: 38,
+      durationSeconds: 600,
+      status: 'completed',
     });
   });
 

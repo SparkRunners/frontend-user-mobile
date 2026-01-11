@@ -14,12 +14,12 @@ const ZONE_RULES_PATH = '/zones/check';
 
 type RentTripDto = {
   id?: string;
-  tripId?: string;
   _id?: string;
+  tripId?: string;
   scooterId?: string;
-  vehicleId?: string;
   scooter_id?: string;
   scooterID?: string;
+  vehicleId?: string;
   userId?: string;
   riderId?: string;
   ownerId?: string;
@@ -28,10 +28,10 @@ type RentTripDto = {
   endTime?: string | null;
   completedAt?: string | null;
   status?: string;
-  cost?: number;
-  totalCost?: number;
-  durationSeconds?: number;
-  elapsedSeconds?: number;
+  cost?: number | string;
+  totalCost?: number | string;
+  duration?: number | string;
+  durationSeconds?: number | string;
 };
 
 const ensureValue = (value: string | undefined, fallback: string | undefined, label: string) => {
@@ -42,61 +42,149 @@ const ensureValue = (value: string | undefined, fallback: string | undefined, la
   return resolved;
 };
 
+const toFiniteNumber = (value: unknown, fallback = 0): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const normalized = value.replace(/,/g, '.');
+    const parsed = Number(normalized);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+};
+
+const parseCurrencyValue = (value: unknown, fallback = 0): number => {
+  if (typeof value === 'string') {
+    const normalized = value.replace(/[^0-9,.-]/g, '').replace(/,/g, '.');
+    const parsed = Number(normalized);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return toFiniteNumber(value, fallback);
+};
+
+const parseDurationSeconds = (value: unknown, fallback = 0): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const match = value.match(/([0-9]+[.,]?[0-9]*)/);
+    if (match) {
+      const numeric = Number(match[1].replace(',', '.'));
+      if (Number.isFinite(numeric)) {
+        if (/hour/i.test(value)) {
+          return Math.round(numeric * 3600);
+        }
+        if (/second/i.test(value)) {
+          return Math.round(numeric);
+        }
+        return Math.round(numeric * 60);
+      }
+    }
+  }
+  return fallback;
+};
+
+const readStringField = (
+  payload: RentTripDto | null | undefined,
+  ...keys: Array<keyof RentTripDto | string>
+): string | undefined => {
+  if (!payload) {
+    return undefined;
+  }
+  for (const key of keys) {
+    const value = (payload as Record<string, unknown>)[key as string];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value;
+    }
+  }
+  return undefined;
+};
+
 const resolveStatus = (payload: RentTripDto): Ride['status'] => {
   const normalized = payload.status?.toLowerCase();
   if (normalized === 'active' || normalized === 'completed' || normalized === 'cancelled') {
     return normalized;
   }
-  return payload.endTime || payload.completedAt ? 'completed' : 'active';
+  return payload.endTime ? 'completed' : 'active';
 };
 
-const mapToRide = (payload: RentTripDto): Ride => {
-  if (!payload) {
+const mapToRide = (payload: RentTripDto | null | undefined, fallback?: Ride): Ride => {
+  if (!payload && !fallback) {
     throw new Error('Ride payload is empty');
   }
 
   const id = ensureValue(
-    payload.id ?? payload.tripId ?? payload._id,
-    undefined,
+    readStringField(payload, 'id', '_id', 'tripId'),
+    fallback?.id,
     'id',
   );
   const scooterId = ensureValue(
-    payload.scooterId ?? payload.vehicleId ?? payload.scooter_id ?? payload.scooterID,
-    undefined,
+    readStringField(payload, 'scooterId', 'scooter_id', 'scooterID', 'vehicleId'),
+    fallback?.scooterId,
     'scooterId',
   );
   const userId = ensureValue(
-    payload.userId ?? payload.riderId ?? payload.ownerId,
-    undefined,
+    readStringField(payload, 'userId', 'riderId', 'ownerId'),
+    fallback?.userId ?? 'unknown-user',
     'userId',
   );
 
-  const startTime = payload.startTime ?? payload.startedAt ?? new Date().toISOString();
-  const endTime = payload.endTime ?? payload.completedAt ?? undefined;
+  const startTime =
+    readStringField(payload, 'startTime', 'startedAt') ??
+    fallback?.startTime ??
+    new Date().toISOString();
+  const endTime =
+    readStringField(payload, 'endTime', 'completedAt') ??
+    fallback?.endTime ??
+    undefined;
+
+  const shouldResolveStatus = Boolean(
+    payload &&
+      (payload.status || payload.endTime || payload.completedAt),
+  );
+  const resolvedStatus = shouldResolveStatus
+    ? resolveStatus(payload as RentTripDto)
+    : fallback?.status ?? 'completed';
+  const cost = parseCurrencyValue(payload?.cost ?? payload?.totalCost, fallback?.cost ?? 0);
+  const durationSeconds = parseDurationSeconds(
+    payload?.durationSeconds ?? payload?.duration,
+    fallback?.durationSeconds ?? 0,
+  );
 
   return {
     id,
     scooterId,
     userId,
     startTime,
-    endTime: endTime ?? undefined,
-    status: resolveStatus(payload),
-    cost: payload.cost ?? payload.totalCost ?? 0,
-    durationSeconds: payload.durationSeconds ?? payload.elapsedSeconds ?? 0,
+    endTime,
+    status: resolvedStatus,
+    cost,
+    durationSeconds,
   };
 };
 
 const encodeId = (value: string) => encodeURIComponent(value);
 
-const unwrapTripPayload = (payload: unknown): RentTripDto => {
+const unwrapTripPayload = (payload: unknown): RentTripDto | null => {
   if (!payload || typeof payload !== 'object') {
-    throw new Error('Ride payload is empty');
+    return null;
   }
+
   const record = payload as Record<string, unknown>;
   if (record.trip && typeof record.trip === 'object') {
     return record.trip as RentTripDto;
   }
-  return payload as RentTripDto;
+
+  if ('id' in record) {
+    return record as RentTripDto;
+  }
+
+  return null;
 };
 
 type GenericRecord = Record<string, unknown>;
@@ -304,11 +392,22 @@ export const rideApi = {
     }
   },
 
-  endRide: async (rideId: string): Promise<Ride> => {
-    const response = await scooterApiClient.post<RentTripDto>(
-      `${RENT_BASE_PATH}/stop/${encodeId(rideId)}`,
-    );
-    return mapToRide(unwrapTripPayload(response.data));
+  endRide: async (scooterId: string, fallback?: Ride): Promise<Ride> => {
+    if (!scooterId) {
+      throw new Error('Scooter-id krävs för att avsluta resan');
+    }
+    try {
+      const response = await scooterApiClient.post<RentTripDto>(
+        `${RENT_BASE_PATH}/stop/${encodeId(scooterId)}`,
+      );
+      return mapToRide(unwrapTripPayload(response.data), fallback);
+    } catch (error) {
+      if (__DEV__) {
+        const response = (error as { response?: { status?: number; data?: unknown } }).response;
+        console.warn('[rideApi] endRide failed', response?.status, response?.data);
+      }
+      throw error;
+    }
   },
 
   getCurrentRide: async (): Promise<Ride | null> => {
