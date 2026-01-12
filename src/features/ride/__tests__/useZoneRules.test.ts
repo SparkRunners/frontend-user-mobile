@@ -1,4 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
+import Geolocation from '@react-native-community/geolocation';
 import { rideApi } from '../api';
 import { MIN_FETCH_INTERVAL_MS, useRideZoneRules } from '../useZoneRules';
 
@@ -8,7 +9,17 @@ jest.mock('../api', () => ({
   },
 }));
 
+jest.mock('@react-native-community/geolocation', () => ({
+  watchPosition: jest.fn(),
+  clearWatch: jest.fn(),
+  getCurrentPosition: jest.fn(),
+  requestAuthorization: jest.fn(),
+  stopObserving: jest.fn(),
+}));
+
 const mockCheckZoneRules = rideApi.checkZoneRules as jest.Mock;
+const mockWatchPosition = Geolocation.watchPosition as jest.Mock;
+const mockClearWatch = Geolocation.clearWatch as jest.Mock;
 
 type MockPosition = {
   coords: {
@@ -17,24 +28,18 @@ type MockPosition = {
   };
 };
 
-type MockGeolocation = {
-  watchPosition: jest.Mock<number, any>;
-  clearWatch: jest.Mock<void, any>;
-};
-
 describe('useRideZoneRules', () => {
-  let originalNavigator: { geolocation?: MockGeolocation } | undefined;
   let successCallback: ((position: MockPosition) => void) | null;
-  let geolocationMock: MockGeolocation;
   let nowSpy: jest.SpyInstance<number, []>;
   let currentTime = MIN_FETCH_INTERVAL_MS + 1_000;
 
   const emitPosition = (latitude: number, longitude: number) => {
-    if (!successCallback) {
+    const callback = successCallback;
+    if (!callback) {
       throw new Error('watchPosition success callback missing');
     }
     act(() => {
-      successCallback({
+      callback({
         coords: { latitude, longitude },
       });
     });
@@ -45,18 +50,11 @@ describe('useRideZoneRules', () => {
     mockCheckZoneRules.mockResolvedValue({ rule: null, nearestParking: null });
     successCallback = null;
     currentTime = MIN_FETCH_INTERVAL_MS + 1_000;
-    geolocationMock = {
-      watchPosition: jest.fn((success: (position: MockPosition) => void) => {
-        successCallback = success;
-        return 1;
-      }),
-      clearWatch: jest.fn(),
-    } as MockGeolocation;
-
-    originalNavigator = (global as unknown as { navigator?: { geolocation?: MockGeolocation } }).navigator;
-    (global as unknown as { navigator: { geolocation: MockGeolocation } }).navigator = {
-      geolocation: geolocationMock,
-    };
+    mockWatchPosition.mockImplementation((success: (position: MockPosition) => void) => {
+      successCallback = success;
+      return 1;
+    });
+    mockClearWatch.mockReturnValue(undefined);
 
     nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => currentTime);
   });
@@ -64,13 +62,9 @@ describe('useRideZoneRules', () => {
   afterEach(() => {
     jest.useRealTimers();
     mockCheckZoneRules.mockReset();
+    mockWatchPosition.mockReset();
+    mockClearWatch.mockReset();
     successCallback = null;
-    const globalWithNavigator = global as unknown as { navigator?: { geolocation?: MockGeolocation } };
-    if (originalNavigator) {
-      globalWithNavigator.navigator = originalNavigator;
-    } else {
-      delete globalWithNavigator.navigator;
-    }
     nowSpy.mockRestore();
   });
 
@@ -83,7 +77,7 @@ describe('useRideZoneRules', () => {
 
     const { result } = renderHook(() => useRideZoneRules(true));
 
-    expect(geolocationMock.watchPosition).toHaveBeenCalledTimes(1);
+    expect(mockWatchPosition).toHaveBeenCalledTimes(1);
     emitPosition(59.33, 18.05);
 
     await waitFor(() => {

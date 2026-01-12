@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Geolocation from '@react-native-community/geolocation';
 import { rideApi } from './api';
 import type { ParkingHint, ZoneRuleMatch } from './types';
 
@@ -18,13 +19,6 @@ const WATCH_OPTIONS: PositionOptions = {
 type SimpleCoords = {
   latitude: number;
   longitude: number;
-};
-
-const getGeolocation = () => {
-  if (typeof navigator !== 'undefined' && navigator.geolocation) {
-    return navigator.geolocation;
-  }
-  return null;
 };
 
 export interface UseRideZoneRulesResult {
@@ -49,9 +43,8 @@ export const useRideZoneRules = (isRiding: boolean): UseRideZoneRulesResult => {
   const mountedRef = useRef(true);
 
   const clearWatch = useCallback(() => {
-    const geolocation = getGeolocation();
-    if (geolocation && watchIdRef.current !== null && typeof geolocation.clearWatch === 'function') {
-      geolocation.clearWatch(watchIdRef.current);
+    if (watchIdRef.current !== null && typeof Geolocation.clearWatch === 'function') {
+      Geolocation.clearWatch(watchIdRef.current);
     }
     watchIdRef.current = null;
   }, []);
@@ -105,21 +98,22 @@ export const useRideZoneRules = (isRiding: boolean): UseRideZoneRulesResult => {
       return;
     }
 
-    const geolocation = getGeolocation();
-    if (!geolocation) {
+    if (typeof Geolocation.watchPosition !== 'function') {
       setError('Platsdelning stöds inte på den här enheten.');
       return;
     }
 
     setError(null);
-    const watchId = geolocation.watchPosition(
+    const watchId = Geolocation.watchPosition(
       position => {
         const coords: SimpleCoords = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
         };
         lastCoordsRef.current = coords;
-        void requestCheck(coords);
+        requestCheck(coords).catch(err => {
+          console.warn('Failed to refresh zone rules from watcher', err);
+        });
       },
       watchError => {
         console.warn('ride zone watch error', watchError);
@@ -131,15 +125,17 @@ export const useRideZoneRules = (isRiding: boolean): UseRideZoneRulesResult => {
     watchIdRef.current = watchId;
 
     return () => {
-      if (geolocation && typeof geolocation.clearWatch === 'function') {
-        geolocation.clearWatch(watchId);
+      if (typeof Geolocation.clearWatch === 'function') {
+        Geolocation.clearWatch(watchId);
       }
       watchIdRef.current = null;
     };
   }, [clearWatch, isRiding, requestCheck]);
 
   const forceRefresh = useCallback(() => {
-    void requestCheck(lastCoordsRef.current, true);
+    requestCheck(lastCoordsRef.current, true).catch(err => {
+      console.warn('Failed to refresh zone rules manually', err);
+    });
   }, [requestCheck]);
 
   return {

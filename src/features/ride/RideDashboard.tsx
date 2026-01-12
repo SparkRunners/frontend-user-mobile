@@ -99,6 +99,7 @@ export const RideDashboard = () => {
             try {
               await endRide();
             } catch (error) {
+              console.error('Failed to end ride', error);
               Alert.alert('Fel', 'Kunde inte avsluta resan. Försök igen.');
             }
           }
