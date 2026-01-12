@@ -136,6 +136,20 @@ describe('rideApi', () => {
     expect(secondHistory[0].cost).toBe(46);
   });
 
+  it('extracts scooter id from nested payloads', async () => {
+    const trip = buildTrip({
+      id: 'rent-nested',
+      scooterId: undefined,
+      scooter_id: undefined,
+      scooter: { id: 'NESTED-1' },
+    });
+    mockGet.mockResolvedValueOnce({ data: [trip] });
+
+    const history = await rideApi.getRideHistory();
+
+    expect(history[0].scooterId).toBe('NESTED-1');
+  });
+
   it('supports paged history payloads containing metadata', async () => {
     const trip = buildTrip({ id: 'rent-meta' });
     mockGet.mockResolvedValueOnce({ data: { count: 1, trips: [trip] } });

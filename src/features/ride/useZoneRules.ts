@@ -8,7 +8,7 @@ type PositionOptions = {
   maximumAge?: number;
 };
 
-const MIN_FETCH_INTERVAL_MS = 8000;
+export const MIN_FETCH_INTERVAL_MS = 8000;
 const WATCH_OPTIONS: PositionOptions = {
   enableHighAccuracy: true,
   timeout: 10_000,

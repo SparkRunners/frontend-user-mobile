@@ -89,6 +89,36 @@ const parseDurationSeconds = (value: unknown, fallback = 0): number => {
   return fallback;
 };
 
+const asNonEmptyString = (value: unknown): string | undefined => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return undefined;
+};
+
+const extractIdentifier = (value: unknown): string | undefined => {
+  const direct = asNonEmptyString(value);
+  if (direct) {
+    return direct;
+  }
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return (
+      asNonEmptyString(record.id) ??
+      asNonEmptyString(record._id) ??
+      asNonEmptyString(record.identifier) ??
+      asNonEmptyString(record.code) ??
+      asNonEmptyString(record.name) ??
+      asNonEmptyString(record.number)
+    );
+  }
+  return undefined;
+};
+
 const readStringField = (
   payload: RentTripDto | null | undefined,
   ...keys: Array<keyof RentTripDto | string>
@@ -98,8 +128,27 @@ const readStringField = (
   }
   for (const key of keys) {
     const value = (payload as Record<string, unknown>)[key as string];
-    if (typeof value === 'string' && value.trim().length > 0) {
-      return value;
+    const stringValue = extractIdentifier(value);
+    if (stringValue) {
+      return stringValue;
+    }
+  }
+  return undefined;
+};
+
+const readNestedIdentifier = (
+  payload: RentTripDto | null | undefined,
+  containerKeys: string[],
+): string | undefined => {
+  if (!payload) {
+    return undefined;
+  }
+  const record = payload as Record<string, unknown>;
+  for (const containerKey of containerKeys) {
+    const nested = record[containerKey];
+    const identifier = extractIdentifier(nested);
+    if (identifier) {
+      return identifier;
     }
   }
   return undefined;
@@ -123,8 +172,11 @@ const mapToRide = (payload: RentTripDto | null | undefined, fallback?: Ride): Ri
     fallback?.id,
     'id',
   );
+  const scooterIdFromPayload =
+    readStringField(payload, 'scooterId', 'scooter_id', 'scooterID', 'vehicleId') ??
+    readNestedIdentifier(payload, ['scooter', 'vehicle', 'asset', 'bike']);
   const scooterId = ensureValue(
-    readStringField(payload, 'scooterId', 'scooter_id', 'scooterID', 'vehicleId'),
+    scooterIdFromPayload,
     fallback?.scooterId,
     'scooterId',
   );
