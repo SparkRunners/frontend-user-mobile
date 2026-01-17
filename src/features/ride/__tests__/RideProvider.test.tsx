@@ -94,4 +94,61 @@ describe('RideProvider', () => {
     expect(result.current.currentRide).toBeNull();
     expect(result.current.durationSeconds).toBe(0);
   });
+
+  it('prevents starting a new ride when one is active', async () => {
+    const mockRide = {
+      id: 'ride_123',
+      scooterId: 'scooter_1',
+      userId: 'user_1',
+      startTime: new Date().toISOString(),
+      status: 'active',
+      cost: 10,
+      durationSeconds: 0,
+    };
+
+    (rideApi.startRide as jest.Mock).mockResolvedValue(mockRide);
+
+    const { result } = renderHook(() => useRide(), { wrapper });
+
+    await act(async () => {
+      await result.current.startRide('scooter_1');
+    });
+
+    await expect(result.current.startRide('scooter_2')).rejects.toThrow(
+      'Du har redan en pågående resa. Avsluta den innan du låser upp en ny.',
+    );
+    expect(rideApi.startRide).toHaveBeenCalledTimes(1);
+  });
+
+  it('prevents overlapping start requests while the first one is pending', async () => {
+    let resolveStart: ((ride: any) => void) | null = null;
+    const pendingRide = new Promise(resolve => {
+      resolveStart = resolve;
+    });
+    (rideApi.startRide as jest.Mock).mockReturnValue(pendingRide);
+
+    const { result } = renderHook(() => useRide(), { wrapper });
+
+    act(() => {
+      result.current.startRide('scooter_1');
+    });
+
+    await expect(result.current.startRide('scooter_2')).rejects.toThrow(
+      'Du har redan en pågående resa. Avsluta den innan du låser upp en ny.',
+    );
+    expect(rideApi.startRide).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveStart?.({
+        id: 'ride_pending',
+        scooterId: 'scooter_1',
+        userId: 'user_1',
+        startTime: new Date().toISOString(),
+        status: 'active',
+        cost: 10,
+        durationSeconds: 0,
+      });
+      await pendingRide;
+    });
+  });
 });

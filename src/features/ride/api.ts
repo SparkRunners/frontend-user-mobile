@@ -397,6 +397,99 @@ const getStatusCode = (error: unknown): number | null => {
   return typeof response.status === 'number' ? response.status : null;
 };
 
+type RideApiErrorInfo = {
+  status?: number;
+  message?: string;
+  data?: Record<string, unknown>;
+};
+
+const extractRideApiError = (error: unknown): RideApiErrorInfo | null => {
+  if (!error || typeof error !== 'object') {
+    return null;
+  }
+  const response = (error as { response?: { status?: number; data?: unknown } }).response;
+  if (!response) {
+    return null;
+  }
+  const data =
+    response.data && typeof response.data === 'object'
+      ? (response.data as Record<string, unknown>)
+      : undefined;
+  const message = (() => {
+    const dataMessage = typeof data?.message === 'string' ? data.message : undefined;
+    if (dataMessage) {
+      return dataMessage;
+    }
+    const dataError = typeof data?.error === 'string' ? data.error : undefined;
+    if (dataError) {
+      return dataError;
+    }
+    return undefined;
+  })();
+  return {
+    status: response.status,
+    message,
+    data,
+  };
+};
+
+const containsKeyword = (source: string | undefined, keyword: string) => {
+  if (!source) {
+    return false;
+  }
+  return source.toLowerCase().includes(keyword.toLowerCase());
+};
+
+const hasBalanceSignal = (info: RideApiErrorInfo | null) => {
+  if (!info) {
+    return false;
+  }
+  if (containsKeyword(info.message, 'balance') || containsKeyword(info.message, 'saldo')) {
+    return true;
+  }
+  const data = info.data;
+  if (!data) {
+    return false;
+  }
+  if ('balance' in data || 'cost' in data) {
+    return true;
+  }
+  const dataMessage = typeof data.message === 'string' ? data.message : undefined;
+  const dataError = typeof data.error === 'string' ? data.error : undefined;
+  return containsKeyword(dataMessage ?? dataError, 'balance');
+};
+
+const isActiveRideConflict = (info: RideApiErrorInfo | null) => {
+  if (!info) {
+    return false;
+  }
+  if (info.status === 409) {
+    return true;
+  }
+  return containsKeyword(info.message, 'active ride') || containsKeyword(info.message, 'ongoing ride');
+};
+
+const resolveRideErrorMessage = (
+  phase: 'start' | 'stop',
+  info: RideApiErrorInfo | null,
+): string | null => {
+  if (!info) {
+    return null;
+  }
+
+  if (hasBalanceSignal(info)) {
+    return phase === 'start'
+      ? 'Saldo räcker inte för att låsa upp. Fyll på ditt konto och försök igen.'
+      : 'Saldo räcker inte för att avsluta resan. Fyll på ditt konto och försök igen.';
+  }
+
+  if (isActiveRideConflict(info)) {
+    return 'Du har redan en pågående resa. Avsluta den innan du låser upp en ny.';
+  }
+
+  return info.message ?? null;
+};
+
 type TripListPayload = RentTripDto[] | { trips?: RentTripDto[] | undefined } | { data?: unknown };
 
 const parseTripPayload = (payload: TripListPayload): { trips: RentTripDto[]; recognized: boolean } => {
@@ -440,6 +533,10 @@ export const rideApi = {
         const response = (error as { response?: { status?: number; data?: unknown } }).response;
         console.warn('[rideApi] startRide failed', response?.status, response?.data);
       }
+      const friendlyMessage = resolveRideErrorMessage('start', extractRideApiError(error));
+      if (friendlyMessage) {
+        throw new Error(friendlyMessage);
+      }
       throw error;
     }
   },
@@ -457,6 +554,10 @@ export const rideApi = {
       if (__DEV__) {
         const response = (error as { response?: { status?: number; data?: unknown } }).response;
         console.warn('[rideApi] endRide failed', response?.status, response?.data);
+      }
+      const friendlyMessage = resolveRideErrorMessage('stop', extractRideApiError(error));
+      if (friendlyMessage) {
+        throw new Error(friendlyMessage);
       }
       throw error;
     }

@@ -100,7 +100,10 @@ export const RideDashboard = () => {
               await endRide();
             } catch (error) {
               console.error('Failed to end ride', error);
-              Alert.alert('Fel', 'Kunde inte avsluta resan. Försök igen.');
+              const message = error instanceof Error
+                ? error.message
+                : 'Kunde inte avsluta resan. Försök igen.';
+              Alert.alert('Fel', message);
             }
           }
         }
@@ -111,6 +114,7 @@ export const RideDashboard = () => {
   return (
     <View style={styles.container}>
       <TouchableOpacity
+        testID="zone-status-banner"
         style={[
           styles.zoneBanner,
           zoneSeverity === 'danger' && styles.zoneBannerDanger,

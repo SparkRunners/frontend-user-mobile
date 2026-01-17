@@ -5,26 +5,34 @@ import type { ZoneCity } from '../zones/types';
 
 // Mock Ride feature
 const mockStartRide = jest.fn();
+const mockRideState: any = {
+  startRide: mockStartRide,
+  endRide: jest.fn(),
+  isRiding: false,
+  currentRide: null,
+  durationSeconds: 0,
+  currentCost: 0,
+  isLoading: false,
+};
+
 jest.mock('../../ride', () => ({
-  useRide: () => ({
-    startRide: mockStartRide,
-    endRide: jest.fn(),
-    isRiding: false,
-    currentRide: null,
-    durationSeconds: 0,
-    currentCost: 0,
-    isLoading: false,
-  }),
+  useRide: () => mockRideState,
   RideDashboard: () => <mock-ride-dashboard testID="ride-dashboard" />,
   TripSummary: () => <mock-trip-summary testID="trip-summary" />,
 }));
 
 // Mock ScanScreen
 jest.mock('../../scan', () => ({
-  ScanScreen: ({ onScanSuccess, onClose }: any) => (
+  ScanScreen: ({ onScanSuccess, onClose, isRideLocked, onRideLockedAttempt }: any) => (
     <mock-scan-screen 
       testID="scan-screen" 
-      onScanSuccess={() => onScanSuccess('3124')}
+      onScanSuccess={() => {
+        if (isRideLocked) {
+          onRideLockedAttempt?.();
+          return;
+        }
+        onScanSuccess('3124');
+      }}
       onClose={onClose}
     />
   ),
@@ -137,6 +145,10 @@ describe('MapScreen', () => {
     mockUseScootersFeed.mockReturnValue(createFeedState());
     mockUseZones.mockReturnValue(createZonesState());
     mockStartRide.mockReset();
+    mockRideState.isRiding = false;
+    mockRideState.isLoading = false;
+    mockRideState.startRide = mockStartRide;
+    mockRideState.endRide = jest.fn();
   });
 
   it('renders the map with correct initial region', async () => {
@@ -244,6 +256,73 @@ describe('MapScreen', () => {
     expect(getByText('Zonfel')).toBeTruthy();
     fireEvent.press(getByTestId('zone-feed-error'));
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders overlays for all zone types and charging markers', () => {
+    mockUseZones.mockReturnValue(createZonesState({
+      parkingZones: [
+        {
+          id: 'park-1',
+          type: 'parking',
+          priority: 1,
+          coordinatesSets: [[
+            { latitude: 59.3, longitude: 18.04 },
+            { latitude: 59.31, longitude: 18.05 },
+          ]],
+        },
+      ],
+      slowSpeedZones: [
+        {
+          id: 'slow-1',
+          type: 'slow-speed',
+          priority: 2,
+          coordinatesSets: [[
+            { latitude: 59.4, longitude: 18.06 },
+            { latitude: 59.41, longitude: 18.07 },
+          ]],
+        },
+      ],
+      noGoZones: [
+        {
+          id: 'no-1',
+          type: 'no-go',
+          priority: 3,
+          coordinatesSets: [[
+            { latitude: 59.5, longitude: 18.08 },
+            { latitude: 59.51, longitude: 18.09 },
+          ]],
+        },
+      ],
+      chargingStations: [
+        {
+          id: 'station-1',
+          type: 'charging',
+          priority: 1,
+          coordinate: { latitude: 59.33, longitude: 18.06 },
+        },
+      ],
+    }));
+
+    const { getByTestId } = render(<MapScreen />);
+
+    expect(getByTestId('zone-parking-park-1-0')).toBeTruthy();
+    expect(getByTestId('zone-slow-speed-slow-1-0')).toBeTruthy();
+    expect(getByTestId('zone-no-go-no-1-0')).toBeTruthy();
+    expect(getByTestId('charging-station-1')).toBeTruthy();
+  });
+
+  it('prevents unlocking when a ride request is already in progress', async () => {
+    mockRideState.isLoading = true;
+
+    const { getByText, getByTestId } = render(<MapScreen />);
+    fireEvent.press(getByText('Skanna'));
+    const scanScreen = getByTestId('scan-screen');
+
+    fireEvent(scanScreen, 'onScanSuccess');
+
+    await waitFor(() => {
+      expect(mockStartRide).not.toHaveBeenCalled();
+    });
   });
 });
 

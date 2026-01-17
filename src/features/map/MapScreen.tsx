@@ -73,7 +73,7 @@ export const MapScreen = () => {
   const [mapRegion, setMapRegion] = useState(STOCKHOLM_REGION);
   const [selectedCity, setSelectedCity] = useState<ZoneCity>('Stockholm');
   const mapRef = useRef<MapView | null>(null);
-  const { startRide, isRiding } = useRide();
+  const { startRide, isRiding, isLoading: rideIsLoading } = useRide();
   const {
     parkingZones,
     slowSpeedZones,
@@ -153,6 +153,17 @@ export const MapScreen = () => {
   }, [parkingZones, slowSpeedZones, noGoZones]);
 
   const handleScanSuccess = async (code: string) => {
+    if (isRiding || rideIsLoading) {
+      Toast.show({
+        type: 'info',
+        text1: 'Resa pågår',
+        text2: 'Avsluta din aktiva resa innan du låser upp en ny.',
+        position: 'bottom',
+      });
+      setShowScanner(false);
+      return;
+    }
+
     setShowScanner(false);
 
     const scooter = resolveScooter(code);
@@ -190,7 +201,10 @@ export const MapScreen = () => {
       
     } catch (error) {
       console.error('Unlock failed:', error);
-      Alert.alert('Fel', 'Kunde inte låsa upp skotern. Försök igen.');
+      const message = error instanceof Error
+        ? error.message
+        : 'Kunde inte låsa upp skotern. Försök igen.';
+      Alert.alert('Fel', message);
     }
   };
 
@@ -223,6 +237,16 @@ export const MapScreen = () => {
         <ScanScreen
           onClose={() => setShowScanner(false)}
           onScanSuccess={handleScanSuccess}
+          isRideLocked={isRiding || rideIsLoading}
+          onRideLockedAttempt={() => {
+            Toast.show({
+              type: 'info',
+              text1: 'Resa pågår',
+              text2: 'Avsluta din aktiva resa innan du låser upp en ny.',
+              position: 'bottom',
+            });
+            setShowScanner(false);
+          }}
           devMockCode={selectedScooter?.id ?? availableScooters[0]?.id ?? null}
         />
       ) : (
@@ -245,6 +269,7 @@ export const MapScreen = () => {
                 return (
                   <Polygon
                     key={`${zone.id}-${idx}`}
+                    testID={`zone-${zone.type}-${zone.id}-${idx}`}
                     coordinates={coordinates}
                     strokeColor={style.strokeColor}
                     fillColor={style.fillColor}

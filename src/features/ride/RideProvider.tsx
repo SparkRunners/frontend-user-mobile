@@ -45,6 +45,12 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
   }, [isRiding]);
 
   const startRide = async (scooterId: string) => {
+    if (!scooterId) {
+      throw new Error('Scooter-id saknas. Försök att läsa QR-koden igen.');
+    }
+    if (currentRide || isLoading) {
+      throw new Error('Du har redan en pågående resa. Avsluta den innan du låser upp en ny.');
+    }
     setIsLoading(true);
     setLastRide(null);
     try {

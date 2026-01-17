@@ -7,18 +7,34 @@ interface ScanScreenProps {
   onClose: () => void;
   onScanSuccess: (code: string) => void;
   devMockCode?: string | null;
+  isRideLocked?: boolean;
+  onRideLockedAttempt?: () => void;
 }
 
-export const ScanScreen = ({ onClose, onScanSuccess, devMockCode }: ScanScreenProps) => {
+export const ScanScreen = ({
+  onClose,
+  onScanSuccess,
+  devMockCode,
+  isRideLocked = false,
+  onRideLockedAttempt,
+}: ScanScreenProps) => {
   const [isScanning, setIsScanning] = useState(true);
+
+  const forwardScan = (code: string) => {
+    if (isRideLocked) {
+      onRideLockedAttempt?.();
+      return;
+    }
+    setIsScanning(false);
+    onScanSuccess(code);
+  };
 
   const onReadCode = (event: any) => {
     if (!isScanning) return;
     
     const code = event.nativeEvent.codeStringValue;
     if (code) {
-      setIsScanning(false);
-      onScanSuccess(code);
+      forwardScan(code);
     }
   };
 
@@ -50,7 +66,7 @@ export const ScanScreen = ({ onClose, onScanSuccess, devMockCode }: ScanScreenPr
         {__DEV__ && devMockCode ? (
           <TouchableOpacity
             style={styles.devButton}
-            onPress={() => onScanSuccess(devMockCode)}
+            onPress={() => forwardScan(devMockCode)}
           >
             <Text style={styles.devButtonText}>[DEV] Simulera Skanning</Text>
           </TouchableOpacity>

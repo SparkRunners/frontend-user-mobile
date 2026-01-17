@@ -260,4 +260,30 @@ describe('rideApi', () => {
     expect(result.rule).toMatchObject({ type: 'no-go', priority: 100 });
     expect(result.nearestParking?.id).toBe('p-42');
   });
+
+  it('throws a friendly error when balance is insufficient on start', async () => {
+    mockPost.mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: { error: 'Balance is insufficient', balance: 12, cost: 100 },
+      },
+    });
+
+    await expect(rideApi.startRide('SCOOT-123')).rejects.toThrow(
+      'Saldo räcker inte för att låsa upp. Fyll på ditt konto och försök igen.',
+    );
+  });
+
+  it('throws a friendly error when balance is insufficient on stop', async () => {
+    mockPost.mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: { message: 'Balance is insufficient', balance: 12, cost: 200 },
+      },
+    });
+
+    await expect(rideApi.endRide('SCOOT-123')).rejects.toThrow(
+      'Saldo räcker inte för att avsluta resan. Fyll på ditt konto och försök igen.',
+    );
+  });
 });
