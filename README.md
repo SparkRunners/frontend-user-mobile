@@ -33,6 +33,16 @@ This repository hosts the SparkRunner user app built with React Native CLI. It i
 
 # Running the App
 
+## Working with the docker-compose stack
+
+When you use the orchestrator repository to start the backend/web microservices, keep the mobile client outside Docker and run it on your host machine:
+
+1. In the orchestrator repo root, run `docker-compose up -d` (or the project-specific alias) to boot `server-auth`, `server-user`, and the web frontends. Wait until all containers report healthy.
+2. Confirm your `.env` in this repo points to the host ports exposed by those containers (for example `AUTH_API_URL=http://localhost:3001`). Edit the values before launching Metro if needed.
+3. Back in this repo, follow the sections below (`npm start`, `npm run ios`, etc.). Metro/Expo will talk to the services through the published localhost ports.
+
+> Why not add the mobile app to docker-compose? React Native requires local emulators, the Android/iOS toolchains, Watchman, and device bridge ports (8081/19000+) that are hard to bundle reliably inside a container. Hosting Metro directly on your machine keeps the workflow simple and satisfies “one command” requirements when paired with the orchestrator stack.
+
 ## Metro bundler
 
 ```bash
@@ -72,6 +82,18 @@ npm run android
 	2. iOS cleanup & rebuild (from repo root): `cd ios && bundle install && bundle exec pod install --repo-update && xcodebuild clean && cd ..`, then `npx react-native run-ios`. If `xcodebuild clean` refuses to delete `ios/build`, remove the folder manually (`rm -rf ios/build`) and rerun the command.
 	3. Android cleanup & rebuild: `cd android && ./gradlew clean && cd ..`, then `npx react-native run-android`.
 	4. Metro cache reset (optional): `npx react-native start --reset-cache`.
+
+### Thorough debug clean
+
+Run these when a debug build behaves inconsistently even after the checklist above:
+
+1. `npx react-native clean` from the repo root (wipes cached Gradle/Xcode artifacts maintained by the CLI).
+2. `cd android && ./gradlew clean && cd ..` to guarantee the debug variant rebuilds all Java/Kotlin outputs.
+3. `cd ios && xcodebuild -workspace FrontendUserMobile.xcworkspace -scheme FrontendUserMobile -configuration Debug clean && cd ..` so the Xcode-derived data for the debug configuration is regenerated on the next run.
+4. Reinstall Pods if native deps recently changed (`cd ios && bundle install && bundle exec pod install && cd ..`).
+5. Relaunch Metro with a cache reset: `npx react-native start --reset-cache`.
+
+Afterwards rerun `npx react-native run-android --variant=debug` or `npx react-native run-ios --configuration Debug` to rebuild from the freshly cleaned state.
 
 # Next Steps
 

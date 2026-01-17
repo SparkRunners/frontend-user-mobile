@@ -45,6 +45,12 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
   }, [isRiding]);
 
   const startRide = async (scooterId: string) => {
+    if (!scooterId) {
+      throw new Error('Scooter-id saknas. Försök att läsa QR-koden igen.');
+    }
+    if (currentRide || isLoading) {
+      throw new Error('Du har redan en pågående resa. Avsluta den innan du låser upp en ny.');
+    }
     setIsLoading(true);
     setLastRide(null);
     try {
@@ -62,8 +68,16 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
   const endRide = async () => {
     if (!currentRide) return;
     setIsLoading(true);
+    const completedAt = new Date().toISOString();
+    const fallbackRide: Ride = {
+      ...currentRide,
+      status: 'completed',
+      endTime: completedAt,
+      durationSeconds,
+      cost: currentCost,
+    };
     try {
-      const completedRide = await rideApi.endRide(currentRide.id);
+      const completedRide = await rideApi.endRide(currentRide.scooterId, fallbackRide);
       // Update the completed ride with actual duration and cost calculated locally if needed,
       // or trust the backend response. Here we use the backend response but ensure cost matches what user saw if possible.
       // For now, we trust the mock API response.

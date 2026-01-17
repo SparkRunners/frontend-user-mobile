@@ -9,7 +9,7 @@ jest.mock('../api', () => ({
 describe('useScootersFeed', () => {
   const mockScooters = [
     {
-      id: 1,
+      id: '1',
       name: 'S1',
       city: 'Sthlm',
       status: 'available',
