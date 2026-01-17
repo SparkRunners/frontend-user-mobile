@@ -45,7 +45,7 @@ const polygonStyleByType = {
   'parking': {
     strokeColor: 'rgba(34,197,94,0.9)',
     fillColor: 'rgba(34,197,94,0.2)',
-    dashPattern: [8, 6],
+    dashPattern: [8, 6] as number[],
     zIndexBase: 10,
   },
   'slow-speed': {
@@ -101,7 +101,7 @@ export const MapScreen = () => {
     isLoading: scootersLoading,
     error: scootersError,
     refetch: refetchScooters,
-  } = useScootersFeed();
+  } = useScootersFeed({ viewport: mapRegion });
 
   const normalizeStatus = useCallback((status?: string | null) => status?.toLowerCase().trim() ?? '', []);
   const availableScooters = useMemo(
@@ -281,7 +281,6 @@ export const MapScreen = () => {
             animationEnabled={true}
             layoutAnimationConf={{
               duration: 300,
-              type: 'spring',
             }}
           >
             {zonePolygons.map(zone =>
@@ -309,11 +308,10 @@ export const MapScreen = () => {
               if (typeof latitude !== 'number' || typeof longitude !== 'number') {
                 return null;
               }
-              const markerKey = scooter.id ?? index;
 
               return (
                 <Marker
-                  key={`${markerKey}-${latitude}-${longitude}`}
+                  key={scooter.id ?? index}
                   testID={`marker-${scooter.id}`}
                   coordinate={{
                     latitude,
@@ -326,10 +324,12 @@ export const MapScreen = () => {
                     setSelectedScooter(scooter);
                   }}
                 >
-                  <View style={[
-                    styles.marker,
-                    selectedScooter?.id === scooter.id && styles.markerSelected
-                  ]}>
+                  <View
+                    style={[
+                      styles.marker,
+                      selectedScooter?.id === scooter.id && styles.markerSelected,
+                    ]}
+                  >
                     <View style={styles.markerIcon} />
                   </View>
                 </Marker>
@@ -654,7 +654,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   pricingErrorContainer: {
-    backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.08)',
+    backgroundColor: 'rgba(220,38,38,0.08)',
     padding: 12,
     borderRadius: 12,
   },
@@ -672,7 +672,7 @@ const styles = StyleSheet.create({
     bottom: 110,
     left: 20,
     right: 20,
-    backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.15)',
+    backgroundColor: 'rgba(220,38,38,0.15)',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
@@ -889,7 +889,7 @@ const styles = StyleSheet.create({
     top: 120,
     right: 16,
     left: 16,
-    backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.15)',
+    backgroundColor: 'rgba(220,38,38,0.15)',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
