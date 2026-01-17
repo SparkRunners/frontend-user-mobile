@@ -3,10 +3,18 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { MapScreen } from '../MapScreen';
 import type { ZoneCity } from '../zones/types';
 
-// Mock react-native-map-clustering
+// Mock react-native-map-clustering to return the mocked MapView
 jest.mock('react-native-map-clustering', () => {
-  const { MapView } = jest.requireActual('react-native-maps');
-  return MapView;
+  // Return the mocked MapView from jest.setup.js
+  const ReactMock = require('react');
+  const { View } = require('react-native');
+  const MockMapView = ReactMock.forwardRef((props: any, ref: any) => {
+    ReactMock.useImperativeHandle(ref, () => ({
+      animateToRegion: jest.fn(),
+    }));
+    return ReactMock.createElement(View, { ...props }, props.children);
+  });
+  return MockMapView;
 });
 
 // Mock Ride feature

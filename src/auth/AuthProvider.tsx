@@ -141,18 +141,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const updateTokenState = useCallback(
     async (nextToken: string | null, options?: { persist?: boolean }) => {
-      authTokenStore.set(nextToken);
-      const shouldPersist = options?.persist ?? true;
-      if (shouldPersist) {
-        if (nextToken) {
+      // If token is provided, validate it first
+      if (nextToken) {
+        const decodedUser = decodeToken(nextToken);
+        if (!decodedUser) {
+          // Invalid token, clear everything
+          authTokenStore.set(null);
+          await tokenStorage.clear();
+          if (isMountedRef.current) {
+            setToken(null);
+            setUser(null);
+          }
+          return;
+        }
+        
+        // Valid token, proceed with saving
+        authTokenStore.set(nextToken);
+        const shouldPersist = options?.persist ?? true;
+        if (shouldPersist) {
           await tokenStorage.save(nextToken);
-        } else {
+        }
+        if (isMountedRef.current) {
+          setToken(nextToken);
+          setUser(decodedUser);
+        }
+      } else {
+        // Clearing token
+        authTokenStore.set(null);
+        const shouldPersist = options?.persist ?? true;
+        if (shouldPersist) {
           await tokenStorage.clear();
         }
-      }
-      if (isMountedRef.current) {
-        setToken(nextToken);
-        setUser(nextToken ? decodeToken(nextToken) : null);
+        if (isMountedRef.current) {
+          setToken(null);
+          setUser(null);
+        }
       }
     },
     [],

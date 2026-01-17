@@ -3,10 +3,13 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { ProfileScreen } from '../ProfileScreen';
 import type { Ride } from '../../ride';
 import { useRideHistory } from '../useRideHistory';
+import { useBalance } from '../useBalance';
 
 jest.mock('../useRideHistory');
+jest.mock('../useBalance');
 
 const mockUseRideHistory = useRideHistory as jest.MockedFunction<typeof useRideHistory>;
+const mockUseBalance = useBalance as jest.MockedFunction<typeof useBalance>;
 
 const sampleRide: Ride = {
   id: 'ride-ui-1',
@@ -22,6 +25,16 @@ const sampleRide: Ride = {
 describe('ProfileScreen', () => {
   beforeEach(() => {
     mockUseRideHistory.mockReset();
+    mockUseBalance.mockReset();
+    
+    // Default mock for useBalance
+    mockUseBalance.mockReturnValue({
+      balance: 150,
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+      fillup: jest.fn(),
+    });
   });
 
   it('renders ride history items', () => {
@@ -61,9 +74,12 @@ describe('ProfileScreen', () => {
       refetch,
     });
 
-    const { getByText } = render(<ProfileScreen />);
+    const { getAllByText, getByText } = render(<ProfileScreen />);
 
-    fireEvent.press(getByText('Uppdatera'));
+    // Get all "Uppdatera" buttons and press the last one (ride history)
+    const updateButtons = getAllByText('Uppdatera');
+    fireEvent.press(updateButtons[updateButtons.length - 1]);
+    
     expect(refetch).toHaveBeenCalled();
     expect(getByText('Oops')).toBeTruthy();
     expect(getByText('Du har inga resor ännu.')).toBeTruthy();

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, Alert, TouchableOpacity } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
 import { Camera } from 'react-native-camera-kit';
 import { theme } from '../../theme';
 
@@ -19,20 +19,25 @@ export const ScanScreen = ({
   onRideLockedAttempt,
 }: ScanScreenProps) => {
   const [isScanning, setIsScanning] = useState(true);
+  const isScanningRef = useRef(true);
 
   const forwardScan = (code: string) => {
+    if (!isScanningRef.current) return;
+    
+    isScanningRef.current = false;
+    setIsScanning(false);
+    
     if (isRideLocked) {
       onRideLockedAttempt?.();
       return;
     }
-    setIsScanning(false);
     onScanSuccess(code);
   };
 
   const onReadCode = (event: any) => {
     if (!isScanning) return;
     
-    const code = event.nativeEvent.codeStringValue;
+    const code = event?.nativeEvent?.codeStringValue;
     if (code) {
       forwardScan(code);
     }
@@ -54,7 +59,7 @@ export const ScanScreen = ({
           <Text style={styles.closeButtonText}>Stäng</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Skanna QR-kod</Text>
-        <View style={{ width: 60 }} /> 
+        <View style={styles.headerSpacer} /> 
       </View>
 
       <View style={styles.overlay}>
@@ -138,5 +143,8 @@ const styles = StyleSheet.create({
     color: 'black',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  headerSpacer: {
+    width: 60,
   },
 });

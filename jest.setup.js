@@ -1,3 +1,4 @@
+/* eslint-env jest */
 require('react-native-gesture-handler/jestSetup');
 
 jest.mock('react-native-reanimated', () => {
@@ -92,3 +93,13 @@ jest.mock('react-native-camera-kit', () => {
     CameraScreen: (props) => React.createElement(View, { ...props, testID: 'camera-screen' }),
   };
 });
+
+// Mock @react-native-community/geolocation
+jest.mock('@react-native-community/geolocation', () => ({
+  getCurrentPosition: jest.fn(),
+  watchPosition: jest.fn(() => 1),
+  clearWatch: jest.fn(),
+  stopObserving: jest.fn(),
+  setRNConfiguration: jest.fn(),
+  requestAuthorization: jest.fn(() => Promise.resolve('granted')),
+}));
