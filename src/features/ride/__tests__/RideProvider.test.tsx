@@ -1,0 +1,154 @@
+import React from 'react';
+import { renderHook, act } from '@testing-library/react-native';
+import { RideProvider, useRide } from '../RideProvider';
+import { rideApi } from '../api';
+
+// Mock the API
+jest.mock('../api', () => ({
+  rideApi: {
+    startRide: jest.fn(),
+    endRide: jest.fn(),
+    getCurrentRide: jest.fn(),
+  },
+}));
+
+describe('RideProvider', () => {
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <RideProvider>{children}</RideProvider>
+  );
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('provides initial state', () => {
+    const { result } = renderHook(() => useRide(), { wrapper });
+
+    expect(result.current.isRiding).toBe(false);
+    expect(result.current.currentRide).toBeNull();
+    expect(result.current.durationSeconds).toBe(0);
+    expect(result.current.currentCost).toBe(0);
+  });
+
+  it('starts a ride successfully', async () => {
+    const mockRide = {
+      id: 'ride_123',
+      scooterId: 'scooter_1',
+      userId: 'user_1',
+      startTime: new Date().toISOString(),
+      status: 'active',
+      cost: 10,
+      durationSeconds: 0,
+    };
+
+    (rideApi.startRide as jest.Mock).mockResolvedValue(mockRide);
+
+    const { result } = renderHook(() => useRide(), { wrapper });
+
+    await act(async () => {
+      await result.current.startRide('scooter_1');
+    });
+
+    expect(rideApi.startRide).toHaveBeenCalledWith('scooter_1');
+    expect(result.current.isRiding).toBe(true);
+    expect(result.current.currentRide).toEqual(mockRide);
+  });
+
+  it('ends a ride successfully', async () => {
+    const mockRide = {
+      id: 'ride_123',
+      scooterId: 'scooter_1',
+      userId: 'user_1',
+      startTime: new Date().toISOString(),
+      status: 'active',
+      cost: 10,
+      durationSeconds: 0,
+    };
+
+    (rideApi.startRide as jest.Mock).mockResolvedValue(mockRide);
+    (rideApi.endRide as jest.Mock).mockResolvedValue({ ...mockRide, status: 'completed' });
+
+    const { result } = renderHook(() => useRide(), { wrapper });
+
+    // Start ride first
+    await act(async () => {
+      await result.current.startRide('scooter_1');
+    });
+
+    expect(result.current.isRiding).toBe(true);
+
+    // End ride
+    await act(async () => {
+      await result.current.endRide();
+    });
+
+    expect(rideApi.endRide).toHaveBeenCalledWith(
+      'scooter_1',
+      expect.objectContaining({
+        id: 'ride_123',
+        scooterId: 'scooter_1',
+        status: 'completed',
+      }),
+    );
+    expect(result.current.isRiding).toBe(false);
+    expect(result.current.currentRide).toBeNull();
+    expect(result.current.durationSeconds).toBe(0);
+  });
+
+  it('prevents starting a new ride when one is active', async () => {
+    const mockRide = {
+      id: 'ride_123',
+      scooterId: 'scooter_1',
+      userId: 'user_1',
+      startTime: new Date().toISOString(),
+      status: 'active',
+      cost: 10,
+      durationSeconds: 0,
+    };
+
+    (rideApi.startRide as jest.Mock).mockResolvedValue(mockRide);
+
+    const { result } = renderHook(() => useRide(), { wrapper });
+
+    await act(async () => {
+      await result.current.startRide('scooter_1');
+    });
+
+    await expect(result.current.startRide('scooter_2')).rejects.toThrow(
+      'Du har redan en pågående resa. Avsluta den innan du låser upp en ny.',
+    );
+    expect(rideApi.startRide).toHaveBeenCalledTimes(1);
+  });
+
+  it('prevents overlapping start requests while the first one is pending', async () => {
+    let resolveStart: ((ride: any) => void) | null = null;
+    const pendingRide = new Promise(resolve => {
+      resolveStart = resolve;
+    });
+    (rideApi.startRide as jest.Mock).mockReturnValue(pendingRide);
+
+    const { result } = renderHook(() => useRide(), { wrapper });
+
+    act(() => {
+      result.current.startRide('scooter_1');
+    });
+
+    await expect(result.current.startRide('scooter_2')).rejects.toThrow(
+      'Du har redan en pågående resa. Avsluta den innan du låser upp en ny.',
+    );
+    expect(rideApi.startRide).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveStart?.({
+        id: 'ride_pending',
+        scooterId: 'scooter_1',
+        userId: 'user_1',
+        startTime: new Date().toISOString(),
+        status: 'active',
+        cost: 10,
+        durationSeconds: 0,
+      });
+      await pendingRide;
+    });
+  });
+});

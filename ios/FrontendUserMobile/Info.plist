@@ -34,7 +34,9 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Vi behöver din plats för att visa skotrar i närheten.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Vi behöver kameran för att skanna QR-koder på skotrar.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
