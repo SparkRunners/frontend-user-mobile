@@ -59,6 +59,12 @@ const polygonStyleByType = {
     dashPattern: undefined,
     zIndexBase: 100,
   },
+  'charging': {
+    strokeColor: 'rgba(59,130,246,0.9)',
+    fillColor: 'rgba(59,130,246,0.25)',
+    dashPattern: undefined,
+    zIndexBase: 30,
+  },
 } as const;
 
 const formatPrice = (value: number, currency: string) => {
@@ -78,7 +84,7 @@ export const MapScreen = () => {
     parkingZones,
     slowSpeedZones,
     noGoZones,
-    chargingStations,
+    chargingZones,
     isLoading: zonesLoading,
     error: zonesError,
     refetch: refetchZones,
@@ -148,9 +154,10 @@ export const MapScreen = () => {
       ...parkingZones,
       ...slowSpeedZones,
       ...noGoZones,
+      ...chargingZones,
     ];
     return merged.sort((a, b) => a.priority - b.priority);
-  }, [parkingZones, slowSpeedZones, noGoZones]);
+  }, [parkingZones, slowSpeedZones, noGoZones, chargingZones]);
 
   const handleScanSuccess = async (code: string) => {
     if (isRiding || rideIsLoading) {
@@ -280,19 +287,6 @@ export const MapScreen = () => {
                 );
               }),
             )}
-
-              {chargingStations.map((station, index) => (
-              <Marker
-                  key={`charging-${station.id ?? `${station.coordinate.latitude}-${station.coordinate.longitude}-${index}`}`}
-                coordinate={station.coordinate}
-                tracksViewChanges={false}
-                testID={`charging-${station.id}`}
-              >
-                <View style={styles.chargingMarker}>
-                  <Text style={styles.chargingMarkerText}>⚡</Text>
-                </View>
-              </Marker>
-            ))}
 
             {availableScooters.map((scooter, index) => {
               const latitude = scooter.coordinates?.latitude;
