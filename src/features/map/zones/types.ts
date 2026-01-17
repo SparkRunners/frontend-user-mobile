@@ -7,31 +7,24 @@ export interface ZoneCoordinate {
   longitude: number;
 }
 
-export interface ZoneMetadata {
-  description?: string;
-  speedLimitKmh?: number;
+export interface ZoneRulesInfo {
+  parkingAllowed?: boolean;
+  ridingAllowed?: boolean;
+  maxSpeed?: number;
 }
 
-interface BaseZone {
+export interface PolygonZone {
   id: string;
+  type: ZoneType;
   name?: string;
   priority: number;
-  metadata?: ZoneMetadata;
-}
-
-export interface PolygonZone extends BaseZone {
-  type: Exclude<ZoneType, 'charging'>;
   coordinatesSets: ZoneCoordinate[][];
-}
-
-export interface ChargingZone extends BaseZone {
-  type: 'charging';
-  coordinate: ZoneCoordinate;
+  rules?: ZoneRulesInfo;
 }
 
 export interface ZonesCollection {
   parkingZones: PolygonZone[];
   slowSpeedZones: PolygonZone[];
   noGoZones: PolygonZone[];
-  chargingStations: ChargingZone[];
+  chargingZones: PolygonZone[];
 }

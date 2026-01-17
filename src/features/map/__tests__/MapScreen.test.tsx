@@ -98,23 +98,16 @@ jest.mock('../../scooters/useScootersFeed', () => ({
 
 type MockPolygonZone = {
   id: string;
-  type: 'parking' | 'slow-speed' | 'no-go';
+  type: 'parking' | 'slow-speed' | 'no-go' | 'charging';
   priority: number;
   coordinatesSets: Array<Array<{ latitude: number; longitude: number }>>;
-};
-
-type MockChargingZone = {
-  id: string;
-  type: 'charging';
-  priority: number;
-  coordinate: { latitude: number; longitude: number };
 };
 
 type MockZonesState = {
   parkingZones: MockPolygonZone[];
   slowSpeedZones: MockPolygonZone[];
   noGoZones: MockPolygonZone[];
-  chargingStations: MockChargingZone[];
+  chargingZones: MockPolygonZone[];
   isLoading: boolean;
   error: string | null;
   refetch: jest.Mock;
@@ -125,7 +118,7 @@ const createZonesState = (overrides: Partial<MockZonesState> = {}): MockZonesSta
   parkingZones: [],
   slowSpeedZones: [],
   noGoZones: [],
-  chargingStations: [],
+  chargingZones: [],
   isLoading: false,
   error: null,
   refetch: jest.fn(),
@@ -293,12 +286,16 @@ describe('MapScreen', () => {
           ]],
         },
       ],
-      chargingStations: [
+      chargingZones: [
         {
           id: 'station-1',
           type: 'charging',
           priority: 1,
-          coordinate: { latitude: 59.33, longitude: 18.06 },
+          coordinatesSets: [[
+            { latitude: 59.33, longitude: 18.06 },
+            { latitude: 59.331, longitude: 18.061 },
+            { latitude: 59.332, longitude: 18.062 },
+          ]],
         },
       ],
     }));
@@ -308,7 +305,7 @@ describe('MapScreen', () => {
     expect(getByTestId('zone-parking-park-1-0')).toBeTruthy();
     expect(getByTestId('zone-slow-speed-slow-1-0')).toBeTruthy();
     expect(getByTestId('zone-no-go-no-1-0')).toBeTruthy();
-    expect(getByTestId('charging-station-1')).toBeTruthy();
+    expect(getByTestId('zone-charging-station-1-0')).toBeTruthy();
   });
 
   it('prevents unlocking when a ride request is already in progress', async () => {

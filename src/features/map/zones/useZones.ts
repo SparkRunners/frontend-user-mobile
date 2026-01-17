@@ -1,13 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { scooterApiClient } from '../../../api/httpClient';
-import type {
-  ChargingZone,
-  PolygonZone,
-  ZoneCity,
-  ZoneCoordinate,
-  ZoneMetadata,
-  ZoneType,
-} from './types';
+import type { PolygonZone, ZoneCity, ZoneCoordinate, ZoneRulesInfo, ZoneType } from './types';
 
 // Base URL (SCOOTER_API_BASE_URL) already ends with /api/v1, so we only append the resource path here.
 const ZONES_ENDPOINT = '/zones';
@@ -31,13 +24,17 @@ type GeoJsonMultiPolygon = {
 type GeoJsonGeometry = GeoJsonPoint | GeoJsonPolygon | GeoJsonMultiPolygon;
 
 type ZoneDto = {
-  id: string;
-  type: string;
+  _id?: string;
+  id?: string;
+  type?: string;
   city?: string;
   name?: string;
   priority?: number;
-  properties?: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
+  rules?: {
+    parkingAllowed?: boolean;
+    ridingAllowed?: boolean;
+    maxSpeed?: number;
+  };
   geometry: GeoJsonGeometry;
 };
 
@@ -69,12 +66,6 @@ const cityLabelToValue = (city?: string): ZoneCity => {
   return 'Stockholm';
 };
 
-const getString = (value: unknown): string | undefined =>
-  typeof value === 'string' ? value : undefined;
-
-const getNumber = (value: unknown): number | undefined =>
-  typeof value === 'number' ? value : undefined;
-
 const normalizeZoneType = (value: string | undefined): ZoneType | null => {
   if (!value) {
     return null;
@@ -98,10 +89,10 @@ const normalizeZoneType = (value: string | undefined): ZoneType | null => {
   }
 };
 
-const toLatLng = (coordinate: [number, number]): ZoneCoordinate => ({
-  longitude: coordinate[0],
-  latitude: coordinate[1],
-});
+const toLatLng = (coordinate: number[]): ZoneCoordinate => {
+  const [longitude = 0, latitude = 0] = coordinate;
+  return { longitude, latitude };
+};
 
 const extractPolygonSets = (
   geometry: GeoJsonPolygon | GeoJsonMultiPolygon,
@@ -114,59 +105,32 @@ const extractPolygonSets = (
   );
 };
 
-const resolvePriority = (dto: ZoneDto): number => {
-  const fromProps = getNumber(dto.properties?.priority);
-  const fromMetadata = getNumber((dto.metadata as Record<string, unknown> | undefined)?.priority);
-  const value =
-    getNumber(dto.priority) ?? fromProps ?? fromMetadata;
-  return typeof value === 'number' ? value : DEFAULT_PRIORITY;
-};
+const resolvePriority = (dto: ZoneDto): number =>
+  typeof dto.priority === 'number' ? dto.priority : DEFAULT_PRIORITY;
 
-const resolveSpeedLimit = (dto: ZoneDto): number | undefined => {
-  const raw =
-    getNumber(dto.properties?.speedLimitKmh) ??
-    getNumber((dto.properties as Record<string, unknown> | undefined)?.speed_limit) ??
-    getNumber((dto.metadata as Record<string, unknown> | undefined)?.speedLimitKmh) ??
-    getNumber((dto.metadata as Record<string, unknown> | undefined)?.speed_limit);
-  return raw;
-};
-
-const buildMetadata = (dto: ZoneDto): ZoneMetadata | undefined => {
-  const description =
-    getString(dto.properties?.description) ??
-    getString((dto.metadata as Record<string, unknown> | undefined)?.description);
-  const speedLimitKmh = resolveSpeedLimit(dto);
-  if (!description && typeof speedLimitKmh !== 'number') {
+const mapRules = (dto: ZoneDto): ZoneRulesInfo | undefined => {
+  if (!dto.rules) {
     return undefined;
   }
-  return {
-    description,
-    speedLimitKmh,
-  };
+  const { parkingAllowed, ridingAllowed, maxSpeed } = dto.rules;
+  if (
+    typeof parkingAllowed === 'undefined' &&
+    typeof ridingAllowed === 'undefined' &&
+    typeof maxSpeed === 'undefined'
+  ) {
+    return undefined;
+  }
+  return { parkingAllowed, ridingAllowed, maxSpeed };
 };
 
-const mapDtoToZone = (dto: ZoneDto): PolygonZone | ChargingZone | null => {
-  const type = normalizeZoneType(dto.type ?? getString(dto.properties?.type));
+const mapDtoToZone = (dto: ZoneDto): PolygonZone | null => {
+  const type = normalizeZoneType(dto.type);
   if (!type) {
     return null;
   }
 
   const priority = resolvePriority(dto);
-  const metadata = buildMetadata(dto);
-
-  if (type === 'charging') {
-    if (dto.geometry.type !== 'Point') {
-      return null;
-    }
-    return {
-      id: dto.id,
-      type: 'charging',
-      name: dto.name,
-      priority,
-      coordinate: toLatLng(dto.geometry.coordinates),
-      metadata,
-    };
-  }
+  const rules = mapRules(dto);
 
   if (dto.geometry.type === 'Point') {
     return null;
@@ -178,13 +142,13 @@ const mapDtoToZone = (dto: ZoneDto): PolygonZone | ChargingZone | null => {
   }
 
   return {
-    id: dto.id,
+    id: dto.id ?? dto._id ?? `${type}-${Math.random()}`,
     type,
     name: dto.name,
     priority,
     coordinatesSets,
-    metadata,
-  } as PolygonZone;
+    rules,
+  };
 };
 
 const sortByPriority = <T extends { priority: number }>(zones: T[]) =>
@@ -194,7 +158,7 @@ export interface UseZonesResult {
   parkingZones: PolygonZone[];
   slowSpeedZones: PolygonZone[];
   noGoZones: PolygonZone[];
-  chargingStations: ChargingZone[];
+  chargingZones: PolygonZone[];
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -205,7 +169,7 @@ export const useZones = (city: ZoneCity = 'Stockholm'): UseZonesResult => {
   const [parkingZones, setParkingZones] = useState<PolygonZone[]>([]);
   const [slowSpeedZones, setSlowSpeedZones] = useState<PolygonZone[]>([]);
   const [noGoZones, setNoGoZones] = useState<PolygonZone[]>([]);
-  const [chargingStations, setChargingStations] = useState<ChargingZone[]>([]);
+  const [chargingZones, setChargingZones] = useState<PolygonZone[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -225,36 +189,35 @@ export const useZones = (city: ZoneCity = 'Stockholm'): UseZonesResult => {
       const nextParking: PolygonZone[] = [];
       const nextSlow: PolygonZone[] = [];
       const nextNoGo: PolygonZone[] = [];
-      const nextCharging: ChargingZone[] = [];
+      const nextCharging: PolygonZone[] = [];
 
       zoneDtos.forEach(dto => {
         const zone = mapDtoToZone(dto);
         if (!zone) {
           return;
         }
-
-        if (zone.type === 'parking') {
-          nextParking.push(zone);
-        } else if (zone.type === 'slow-speed') {
-          nextSlow.push(zone);
-        } else if (zone.type === 'no-go') {
-          nextNoGo.push(zone);
-        } else if (zone.type === 'charging') {
-          nextCharging.push(zone);
-        }
+            if (zone.type === 'parking') {
+              nextParking.push(zone);
+            } else if (zone.type === 'slow-speed') {
+              nextSlow.push(zone);
+            } else if (zone.type === 'no-go') {
+              nextNoGo.push(zone);
+            } else if (zone.type === 'charging') {
+              nextCharging.push(zone);
+            }
       });
 
       setParkingZones(sortByPriority(nextParking));
       setSlowSpeedZones(sortByPriority(nextSlow));
       setNoGoZones(sortByPriority(nextNoGo));
-      setChargingStations(sortByPriority(nextCharging));
+      setChargingZones(sortByPriority(nextCharging));
     } catch (err) {
       console.error('Failed to load zones', err);
       setError('Kunde inte hämta zoner. Försök igen.');
       setParkingZones([]);
       setSlowSpeedZones([]);
       setNoGoZones([]);
-      setChargingStations([]);
+      setChargingZones([]);
     } finally {
       setIsLoading(false);
     }
@@ -270,7 +233,7 @@ export const useZones = (city: ZoneCity = 'Stockholm'): UseZonesResult => {
     parkingZones,
     slowSpeedZones,
     noGoZones,
-    chargingStations,
+    chargingZones,
     isLoading,
     error,
     refetch,
