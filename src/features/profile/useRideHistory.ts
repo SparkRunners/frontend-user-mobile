@@ -14,16 +14,19 @@ export const useRideHistory = (): RideHistoryState => {
   const [error, setError] = useState<string | null>(null);
 
   const loadHistory = useCallback(async () => {
+    console.log('[useRideHistory] Starting to load history...');
     setIsLoading(true);
     setError(null);
     try {
       const data = await rideApi.getRideHistory();
+      console.log('[useRideHistory] Loaded rides:', data.length);
       setRides(data);
     } catch (err) {
-      console.error('Failed to fetch ride history', err);
+      console.error('[useRideHistory] Failed to fetch ride history', err);
       setError('Kunde inte hämta tidigare resor. Försök igen.');
     } finally {
       setIsLoading(false);
+      console.log('[useRideHistory] Load complete');
     }
   }, []);
 

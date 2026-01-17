@@ -131,7 +131,7 @@ export const ProfileScreen = () => {
             </TouchableOpacity>
           </View>
           <Text style={styles.sectionDescription}>
-            Dina senaste resor listas här. När backend-API:et är klart kommer samma hook att hämtas från servern istället för mock-data.
+            Dina senaste resor listas här.
           </Text>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           {isLoading && rides.length === 0 ? (
@@ -146,8 +146,8 @@ export const ProfileScreen = () => {
               Du har inga resor ännu.
             </Text>
           ) : null}
-          {rides.map(ride => (
-            <RideHistoryItem ride={ride} key={ride.id} />
+          {rides.map((ride, index) => (
+            <RideHistoryItem ride={ride} key={ride.id || `ride-${index}`} />
           ))}
         </View>
 
