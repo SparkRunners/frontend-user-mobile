@@ -1,4 +1,5 @@
 import { scooterApiClient } from '../../api/httpClient';
+import { runtimeConfig } from '../../config';
 import {
   Ride,
   ZoneCheckRequest,
@@ -523,6 +524,22 @@ const parseTripPayload = (payload: TripListPayload): { trips: RentTripDto[]; rec
 
 export const rideApi = {
   startRide: async (scooterId: string): Promise<Ride> => {
+    // In simulation mode, return mock ride data instead of calling backend API
+    if (runtimeConfig.simulation.enabled) {
+      if (__DEV__) {
+        console.log('[rideApi] Simulation mode: returning mock ride for scooter', scooterId);
+      }
+      return {
+        id: `sim-ride-${Date.now()}`,
+        scooterId,
+        userId: 'sim-user',
+        status: 'active',
+        startTime: new Date().toISOString(),
+        cost: 0,
+        durationSeconds: 0,
+      };
+    }
+
     try {
       const response = await scooterApiClient.post<RentTripDto>(
         `${RENT_BASE_PATH}/start/${encodeId(scooterId)}`,
@@ -545,6 +562,19 @@ export const rideApi = {
     if (!scooterId) {
       throw new Error('Scooter-id krävs för att avsluta resan');
     }
+
+    // In simulation mode, return completed ride based on fallback data
+    if (runtimeConfig.simulation.enabled && fallback) {
+      if (__DEV__) {
+        console.log('[rideApi] Simulation mode: returning completed ride for scooter', scooterId);
+      }
+      return {
+        ...fallback,
+        status: 'completed',
+        endTime: new Date().toISOString(),
+      };
+    }
+
     try {
       const response = await scooterApiClient.post<RentTripDto>(
         `${RENT_BASE_PATH}/stop/${encodeId(scooterId)}`,
