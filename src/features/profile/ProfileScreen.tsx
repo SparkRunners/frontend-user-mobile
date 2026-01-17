@@ -1,16 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Toast from 'react-native-toast-message';
 import { theme } from '../../theme';
 import { Ride } from '../ride';
 import { useRideHistory } from './useRideHistory';
+import { useBalance } from './useBalance';
 
 const formatDateTime = (iso: string) =>
   new Date(iso).toLocaleString('sv-SE', {
@@ -48,11 +52,76 @@ const RideHistoryItem = ({ ride }: { ride: Ride }) => (
 
 export const ProfileScreen = () => {
   const { rides, isLoading, error, refetch } = useRideHistory();
+  const { balance, isLoading: balanceLoading, error: balanceError, refetch: refetchBalance, fillup } = useBalance();
+  const [fillupAmount, setFillupAmount] = useState('');
+  const [isFilling, setIsFilling] = useState(false);
+
+  const handleFillup = async () => {
+    const amount = parseFloat(fillupAmount);
+    if (isNaN(amount) || amount <= 0) {
+      Alert.alert('Ogiltigt belopp', 'Ange ett giltigt belopp större än 0');
+      return;
+    }
+
+    setIsFilling(true);
+    try {
+      await fillup(amount);
+      setFillupAmount('');
+      Toast.show({
+        type: 'success',
+        text1: 'Påfyllning lyckades',
+        text2: `${amount} kr har lagts till på ditt konto`,
+        position: 'bottom',
+      });
+    } catch (err) {
+      Alert.alert('Fel', err instanceof Error ? err.message : 'Kunde inte fylla på saldo');
+    } finally {
+      setIsFilling(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <Text style={styles.title}>Min sida</Text>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Saldo</Text>
+            <TouchableOpacity onPress={refetchBalance} disabled={balanceLoading} style={styles.refreshButton}>
+              <Text style={styles.refreshButtonText}>{balanceLoading ? 'Laddar...' : 'Uppdatera'}</Text>
+            </TouchableOpacity>
+          </View>
+          {balanceError ? <Text style={styles.errorText}>{balanceError}</Text> : null}
+          {balanceLoading && balance === null ? (
+            <ActivityIndicator color={theme.colors.brand} style={styles.loader} testID="balance-loader" />
+          ) : (
+            <Text style={styles.balanceAmount} testID="balance-amount">
+              {balance !== null ? `${balance.toFixed(2)} kr` : 'Ej tillgängligt'}
+            </Text>
+          )}
+          
+          <View style={styles.fillupContainer}>
+            <TextInput
+              style={styles.fillupInput}
+              placeholder="Belopp att fylla på"
+              placeholderTextColor={theme.colors.textMuted}
+              keyboardType="numeric"
+              value={fillupAmount}
+              onChangeText={setFillupAmount}
+              editable={!isFilling}
+              testID="fillup-input"
+            />
+            <TouchableOpacity
+              style={[styles.fillupButton, (isFilling || !fillupAmount) && styles.fillupButtonDisabled]}
+              onPress={handleFillup}
+              disabled={isFilling || !fillupAmount}
+              testID="fillup-button"
+            >
+              <Text style={styles.fillupButtonText}>{isFilling ? 'Fyller på...' : 'Fyll på'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -62,7 +131,7 @@ export const ProfileScreen = () => {
             </TouchableOpacity>
           </View>
           <Text style={styles.sectionDescription}>
-            Dina senaste resor listas här. När backend-API:et är klart kommer samma hook att hämtas från servern istället för mock-data.
+            Dina senaste resor listas här.
           </Text>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           {isLoading && rides.length === 0 ? (
@@ -77,8 +146,8 @@ export const ProfileScreen = () => {
               Du har inga resor ännu.
             </Text>
           ) : null}
-          {rides.map(ride => (
-            <RideHistoryItem ride={ride} key={ride.id} />
+          {rides.map((ride, index) => (
+            <RideHistoryItem ride={ride} key={ride.id || `ride-${index}`} />
           ))}
         </View>
 
@@ -87,7 +156,8 @@ export const ProfileScreen = () => {
           <Text style={styles.sectionDescription}>
             - Pågående resor styrs från kartan.
             {'\n'}- Du kan avsluta en resa och se summeringen.
-            {'\n'}- Historiken ovan använder ett mock-API och kan kopplas mot backend så snart end-points finns.
+            {'\n'}- Saldo och påfyllning kopplas nu mot backend API.
+            {'\n'}- Historiken hämtas från servern.
           </Text>
         </View>
       </ScrollView>
@@ -197,6 +267,40 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 999,
     fontSize: 12,
+    fontWeight: '600',
+  },
+  balanceAmount: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: theme.colors.brand,
+    marginVertical: 8,
+  },
+  fillupContainer: {
+    marginTop: 16,
+    gap: 12,
+  },
+  fillupInput: {
+    backgroundColor: theme.colors.background,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: theme.colors.text,
+  },
+  fillupButton: {
+    backgroundColor: theme.colors.brand,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  fillupButtonDisabled: {
+    opacity: 0.5,
+  },
+  fillupButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });

@@ -16,6 +16,13 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+// Define HeaderRight component outside of render
+const HeaderRight = ({ onPress }: { onPress: () => void }) => (
+  <TouchableOpacity onPress={onPress} style={styles.menuButton}>
+    <Text style={styles.menuButtonText}>Meny</Text>
+  </TouchableOpacity>
+);
+
 export const AppNavigator = () => {
   return (
     <NavigationContainer>
@@ -25,14 +32,7 @@ export const AppNavigator = () => {
           component={MapScreen}
           options={({ navigation }) => ({
             title: 'Karta',
-            headerRight: () => (
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Profile')}
-                style={styles.menuButton}
-              >
-                <Text style={styles.menuButtonText}>Meny</Text>
-              </TouchableOpacity>
-            ),
+            headerRight: () => <HeaderRight onPress={() => navigation.navigate('Profile')} />,
           })}
         />
         <Stack.Screen

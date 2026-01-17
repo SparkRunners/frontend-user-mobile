@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker, Polygon } from 'react-native-maps';
+import ClusteredMapView from 'react-native-map-clustering';
 import { theme } from '../../theme';
 import { Scooter } from '../scooters/api';
 import { ScanScreen } from '../scan';
@@ -258,7 +259,7 @@ export const MapScreen = () => {
         />
       ) : (
         <>
-          <MapView
+          <ClusteredMapView
             ref={mapRef}
             testID="map-view"
             provider={PROVIDER_DEFAULT}
@@ -269,6 +270,19 @@ export const MapScreen = () => {
             showsMyLocationButton={true}
             onPress={() => setSelectedScooter(null)}
             onRegionChangeComplete={region => setMapRegion(region)}
+            clusterColor={theme.colors.brand}
+            clusterTextColor="#FFFFFF"
+            clusterFontFamily="System"
+            radius={60}
+            extent={512}
+            maxZoom={20}
+            minZoom={3}
+            preserveClusterPressBehavior={true}
+            animationEnabled={true}
+            layoutAnimationConf={{
+              duration: 300,
+              type: 'spring',
+            }}
           >
             {zonePolygons.map(zone =>
               zone.coordinatesSets.map((coordinates, idx) => {
@@ -321,7 +335,7 @@ export const MapScreen = () => {
                 </Marker>
               );
             })}
-          </MapView>
+          </ClusteredMapView>
 
           {isRiding ? (
             <RideDashboard />

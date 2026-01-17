@@ -173,7 +173,7 @@ const mapToRide = (payload: RentTripDto | null | undefined, fallback?: Ride): Ri
     'id',
   );
   const scooterIdFromPayload =
-    readStringField(payload, 'scooterId', 'scooter_id', 'scooterID', 'vehicleId') ??
+    readStringField(payload, 'scooterId', 'scooter_id', 'scooterID', 'vehicleId', 'scooter') ??
     readNestedIdentifier(payload, ['scooter', 'vehicle', 'asset', 'bike']);
   const scooterId = ensureValue(
     scooterIdFromPayload,
