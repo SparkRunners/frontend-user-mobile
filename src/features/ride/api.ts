@@ -1,5 +1,4 @@
 import { scooterApiClient } from '../../api/httpClient';
-import { runtimeConfig } from '../../config';
 import {
   Ride,
   ZoneCheckRequest,
@@ -274,44 +273,6 @@ const toCoordinate = (source?: GenericRecord): GeoCoordinate | null => {
   return { latitude, longitude };
 };
 
-const normalizeRuleType = (value?: string): ZoneRuleMatch['type'] => {
-  if (!value) {
-    return 'normal';
-  }
-  const normalized = value.toLowerCase();
-  if (normalized === 'no-go' || normalized === 'no_go') {
-    return 'no-go';
-  }
-  if (normalized === 'slow-speed' || normalized === 'slow_speed' || normalized === 'slow') {
-    return 'slow-speed';
-  }
-  if (normalized === 'parking') {
-    return 'parking';
-  }
-  if (normalized === 'charging') {
-    return 'charging';
-  }
-  return value as ZoneRuleMatch['type'];
-};
-
-const mapToZoneRuleMatch = (source?: GenericRecord | null): ZoneRuleMatch | null => {
-  if (!source) {
-    return null;
-  }
-  const type = normalizeRuleType(readString(source, 'rule', 'type', 'name'));
-  const priority = readNumber(source, 'priority', 'severity', 'weight') ?? 0;
-  const message = readString(source, 'message', 'description', 'label');
-  const speedLimit =
-    readNumber(source, 'speedLimitKmh', 'speed_limit_kmh', 'speedLimit', 'speed_limit');
-
-  return {
-    type,
-    priority,
-    message,
-    speedLimitKmh: speedLimit,
-  };
-};
-
 const mapToParkingHint = (source?: GenericRecord | null): ParkingHint | null => {
   if (!source) {
     return null;
@@ -354,30 +315,66 @@ const extractZoneRulePayload = (payload: unknown): GenericRecord | null => {
   return record;
 };
 
-const toArray = (value: unknown): GenericRecord[] =>
-  Array.isArray(value) ? (value as GenericRecord[]) : [];
-
 const mapZoneCheckResult = (payload: unknown): ZoneCheckResult => {
   const source = extractZoneRulePayload(payload);
   if (!source) {
     return { rule: null, nearestParking: null };
   }
 
-  const ruleCandidates: GenericRecord[] = [
-    ...toArray(source.rules),
-    ...toArray(source.violations),
-  ];
+  // Backend format: { inZone, rules: { parkAllowed, rideAllowed, maxSpeed, hasCharging }, alert }
+  let rule: ZoneRuleMatch | null = null;
 
-  if (!ruleCandidates.length && (source.rule || source.type)) {
-    ruleCandidates.push(source);
+  if (source.inZone === false || !source.rules) {
+    // Outside all zones or no rules - check for alert message
+    rule = source.alert ? {
+      type: 'no-go',
+      priority: 100,
+      message: readString(source, 'alert') || 'Riding not allowed in this area',
+      speedLimitKmh: undefined,
+    } : null;
+  } else if (source.rules && typeof source.rules === 'object') {
+    const rules = source.rules as GenericRecord;
+    const rideAllowed = rules.rideAllowed === true;
+    const parkAllowed = rules.parkAllowed === true;
+    const maxSpeed = readNumber(rules, 'maxSpeed');
+    const hasCharging = rules.hasCharging === true;
+
+    if (!rideAllowed) {
+      // No-go zone
+      rule = {
+        type: 'no-go',
+        priority: 100,
+        message: 'Du är i en förbjuden zon. Flytta skotern till tillåten plats.',
+        speedLimitKmh: undefined,
+      };
+    } else if (maxSpeed && maxSpeed > 0 && maxSpeed < 25) {
+      // Slow-speed zone (only if maxSpeed is positive and less than normal speed)
+      rule = {
+        type: 'slow-speed',
+        priority: 50,
+        message: `Låg-hastighetszon. Max hastighet: ${maxSpeed} km/h`,
+        speedLimitKmh: maxSpeed,
+      };
+    } else if (parkAllowed) {
+      // Parking zone
+      rule = {
+        type: 'parking',
+        priority: 30,
+        message: 'Du är i en parkeringszon.',
+        speedLimitKmh: undefined,
+      };
+    } else if (hasCharging) {
+      // Charging zone
+      rule = {
+        type: 'charging',
+        priority: 40,
+        message: 'Du är i en laddzon.',
+        speedLimitKmh: undefined,
+      };
+    }
   }
 
-  const orderedRules = ruleCandidates
-    .map(candidate => mapToZoneRuleMatch(candidate))
-    .filter((candidate): candidate is ZoneRuleMatch => Boolean(candidate))
-    .sort((a, b) => b.priority - a.priority);
-
-  const rule = orderedRules[0] ?? null;
+  // Backend doesn't provide nearestParking yet
   const nearestParking = mapToParkingHint(
     (source.nearestParking as GenericRecord | undefined) ??
       (source.nearest_parking as GenericRecord | undefined) ??
@@ -524,22 +521,6 @@ const parseTripPayload = (payload: TripListPayload): { trips: RentTripDto[]; rec
 
 export const rideApi = {
   startRide: async (scooterId: string): Promise<Ride> => {
-    // In simulation mode, return mock ride data instead of calling backend API
-    if (runtimeConfig.simulation.enabled) {
-      if (__DEV__) {
-        console.log('[rideApi] Simulation mode: returning mock ride for scooter', scooterId);
-      }
-      return {
-        id: `sim-ride-${Date.now()}`,
-        scooterId,
-        userId: 'sim-user',
-        status: 'active',
-        startTime: new Date().toISOString(),
-        cost: 0,
-        durationSeconds: 0,
-      };
-    }
-
     try {
       const response = await scooterApiClient.post<RentTripDto>(
         `${RENT_BASE_PATH}/start/${encodeId(scooterId)}`,
@@ -561,18 +542,6 @@ export const rideApi = {
   endRide: async (scooterId: string, fallback?: Ride): Promise<Ride> => {
     if (!scooterId) {
       throw new Error('Scooter-id krävs för att avsluta resan');
-    }
-
-    // In simulation mode, return completed ride based on fallback data
-    if (runtimeConfig.simulation.enabled && fallback) {
-      if (__DEV__) {
-        console.log('[rideApi] Simulation mode: returning completed ride for scooter', scooterId);
-      }
-      return {
-        ...fallback,
-        status: 'completed',
-        endTime: new Date().toISOString(),
-      };
     }
 
     try {

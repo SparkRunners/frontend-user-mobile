@@ -78,10 +78,13 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
     };
     try {
       const completedRide = await rideApi.endRide(currentRide.scooterId, fallbackRide);
-      // Update the completed ride with actual duration and cost calculated locally if needed,
-      // or trust the backend response. Here we use the backend response but ensure cost matches what user saw if possible.
-      // For now, we trust the mock API response.
-      setLastRide(completedRide);
+      // Use frontend calculated duration if backend returns 0 (due to rounding)
+      // But always trust backend for cost calculation
+      const finalRide = {
+        ...completedRide,
+        durationSeconds: completedRide.durationSeconds > 0 ? completedRide.durationSeconds : durationSeconds,
+      };
+      setLastRide(finalRide);
       setCurrentRide(null);
       setDurationSeconds(0);
     } catch (error) {
