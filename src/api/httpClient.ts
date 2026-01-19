@@ -3,6 +3,15 @@ import { runtimeConfig } from '../config';
 
 let accessToken: string | null = null;
 
+type UnauthorizedHandler = (error?: unknown) => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export const registerUnauthorizedHandler = (
+  handler: UnauthorizedHandler | null,
+) => {
+  unauthorizedHandler = handler;
+};
+
 export const authTokenStore = {
   set(token: string | null) {
     accessToken = token;
@@ -17,7 +26,7 @@ const createHttpClient = (
   timeoutMs = 15_000,
 ): AxiosInstance => {
   if (!baseURL) {
-    throw new Error('缺少 baseURL，无法创建 Axios 实例');
+    throw new Error('Missing baseURL. Unable to create Axios instance');
   }
 
   const instance = axios.create({
@@ -35,6 +44,16 @@ const createHttpClient = (
     }
     return config;
   });
+
+  instance.interceptors.response.use(
+    response => response,
+    error => {
+      if (error?.response?.status === 401 && unauthorizedHandler) {
+        unauthorizedHandler(error);
+      }
+      return Promise.reject(error);
+    },
+  );
 
   return instance;
 };
