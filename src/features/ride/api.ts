@@ -324,14 +324,9 @@ const mapZoneCheckResult = (payload: unknown): ZoneCheckResult => {
   // Backend format: { inZone, rules: { parkAllowed, rideAllowed, maxSpeed, hasCharging }, alert }
   let rule: ZoneRuleMatch | null = null;
 
+  // If outside all zones, allow normal riding (no restrictions)
   if (source.inZone === false || !source.rules) {
-    // Outside all zones or no rules - check for alert message
-    rule = source.alert ? {
-      type: 'no-go',
-      priority: 100,
-      message: readString(source, 'alert') || 'Riding not allowed in this area',
-      speedLimitKmh: undefined,
-    } : null;
+    rule = null;
   } else if (source.rules && typeof source.rules === 'object') {
     const rules = source.rules as GenericRecord;
     const rideAllowed = rules.rideAllowed === true;
@@ -340,7 +335,7 @@ const mapZoneCheckResult = (payload: unknown): ZoneCheckResult => {
     const hasCharging = rules.hasCharging === true;
 
     if (!rideAllowed) {
-      // No-go zone
+      // No-go zone (riding not allowed within this zone)
       rule = {
         type: 'no-go',
         priority: 100,
