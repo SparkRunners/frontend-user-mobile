@@ -313,7 +313,7 @@ describe('useBalance', () => {
       });
       mockUserApi.getBalance.mockResolvedValue(500);
 
-      rerender({});
+      rerender();
 
       await waitFor(() => {
         expect(result.current.balance).toBe(500);
@@ -343,7 +343,7 @@ describe('useBalance', () => {
         logout: jest.fn(),
       });
 
-      rerender({});
+      rerender();
 
       await waitFor(() => {
         expect(result.current.balance).toBeNull();

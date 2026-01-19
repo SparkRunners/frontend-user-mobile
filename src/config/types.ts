@@ -5,11 +5,6 @@ export interface ServiceEndpointConfig {
   timeoutMs?: number;
 }
 
-export interface SimulationConfig {
-  enabled: boolean;
-  socketUrl: string;
-}
-
 export interface OAuthProviderConfig {
   clientId: string;
   redirectUri: string;
@@ -27,6 +22,5 @@ export interface RuntimeConfig {
     scooterApi: ServiceEndpointConfig;
     authApi: ServiceEndpointConfig;
   };
-  simulation: SimulationConfig;
   oauth: OAuthConfig;
 }

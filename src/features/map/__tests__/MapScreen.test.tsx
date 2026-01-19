@@ -3,28 +3,16 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { MapScreen } from '../MapScreen';
 import type { ZoneCity } from '../zones/types';
 
-// Mock navigation
-const mockNavigate = jest.fn();
-jest.mock('@react-navigation/native', () => {
-  const actual = jest.requireActual('@react-navigation/native');
-  return {
-    ...actual,
-    useNavigation: () => ({
-      navigate: mockNavigate,
-    }),
-  };
-});
-
 // Mock react-native-map-clustering to return the mocked MapView
 jest.mock('react-native-map-clustering', () => {
   // Return the mocked MapView from jest.setup.js
   const ReactMock = require('react');
-  const { View: MockView } = require('react-native');
+  const { View } = require('react-native');
   const MockMapView = ReactMock.forwardRef((props: any, ref: any) => {
     ReactMock.useImperativeHandle(ref, () => ({
       animateToRegion: jest.fn(),
     }));
-    return ReactMock.createElement(MockView, { ...props }, props.children);
+    return ReactMock.createElement(View, { ...props }, props.children);
   });
   return MockMapView;
 });
@@ -41,44 +29,28 @@ const mockRideState: any = {
   isLoading: false,
 };
 
-jest.mock('../../ride', () => {
-  const ReactLib = require('react');
-  const { View: ViewComponent } = require('react-native');
-  
-  return {
-    useRide: () => mockRideState,
-    RideDashboard: () => ReactLib.createElement(ViewComponent, { testID: 'ride-dashboard' }),
-    TripSummary: () => ReactLib.createElement(ViewComponent, { testID: 'trip-summary' }),
-  };
-});
+jest.mock('../../ride', () => ({
+  useRide: () => mockRideState,
+  RideDashboard: () => <mock-ride-dashboard testID="ride-dashboard" />,
+  TripSummary: () => <mock-trip-summary testID="trip-summary" />,
+}));
 
 // Mock ScanScreen
-jest.mock('../../scan', () => {
-  const ReactLib = require('react');
-  const { View: ViewComponent, TouchableOpacity: TouchableOpacityComponent } = require('react-native');
-  
-  return {
-    ScanScreen: ({ onScanSuccess, onClose, isRideLocked, onRideLockedAttempt }: any) =>
-      ReactLib.createElement(
-        ViewComponent,
-        { testID: 'scan-screen' },
-        ReactLib.createElement(TouchableOpacityComponent, {
-          testID: 'scan-trigger',
-          onPress: () => {
-            if (isRideLocked) {
-              onRideLockedAttempt?.();
-              return;
-            }
-            onScanSuccess('3124');
-          },
-        }),
-        ReactLib.createElement(TouchableOpacityComponent, {
-          testID: 'close-trigger',
-          onPress: onClose,
-        })
-      ),
-  };
-});
+jest.mock('../../scan', () => ({
+  ScanScreen: ({ onScanSuccess, onClose, isRideLocked, onRideLockedAttempt }: any) => (
+    <mock-scan-screen 
+      testID="scan-screen" 
+      onScanSuccess={() => {
+        if (isRideLocked) {
+          onRideLockedAttempt?.();
+          return;
+        }
+        onScanSuccess('3124');
+      }}
+      onClose={onClose}
+    />
+  ),
+}));
 
 jest.mock('../../pricing/usePricing', () => ({
   usePricing: () => ({
@@ -191,8 +163,9 @@ describe('MapScreen', () => {
     expect(getByTestId('map-view')).toBeTruthy();
   });
 
-  it('renders zoom controls', () => {
+  it('renders zone legend and zoom controls', () => {
     const { getByTestId } = render(<MapScreen />);
+    expect(getByTestId('zone-legend')).toBeTruthy();
     expect(getByTestId('zoom-in-button')).toBeTruthy();
     expect(getByTestId('zoom-out-button')).toBeTruthy();
   });
@@ -238,9 +211,8 @@ describe('MapScreen', () => {
     const scanScreen = getByTestId('scan-screen');
     expect(scanScreen).toBeTruthy();
     
-    // Trigger scan success by pressing the scan-trigger button in the mock
-    const scanTrigger = getByTestId('scan-trigger');
-    fireEvent.press(scanTrigger);
+    // Trigger scan success (simulated by our mock)
+    fireEvent(scanScreen, 'onScanSuccess');
     
     // Verify startRide was called
     await waitFor(() => {
@@ -256,8 +228,8 @@ describe('MapScreen', () => {
     const { getByTestId, getByText } = render(<MapScreen />);
 
     expect(getByTestId('scooter-feed-loading')).toBeTruthy();
-    expect(getByText('Hämtar skotrar...')).toBeTruthy();
-    // Note: scan button is not disabled during scooter loading
+    expect(getByText('Hämtar...')).toBeTruthy();
+    expect(getByTestId('scan-button').props.accessibilityState?.disabled).toBe(true);
   });
 
   it('renders error banner and retries the feed', () => {
@@ -275,13 +247,8 @@ describe('MapScreen', () => {
 
   it('allows switching cities for zone filtering', () => {
     const { getByTestId, getByText } = render(<MapScreen />);
-    
-    // 点击城市选择器按钮打开下拉菜单
-    const selectorButton = getByTestId('city-selector-button');
-    expect(selectorButton).toBeTruthy();
-    fireEvent.press(selectorButton);
-    
-    // 点击 Göteborg 选项
+    const selector = getByTestId('city-selector');
+    expect(selector).toBeTruthy();
     fireEvent.press(getByText('Göteborg'));
     expect(mockUseZones).toHaveBeenLastCalledWith('Göteborg');
   });

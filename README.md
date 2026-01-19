@@ -1,24 +1,5 @@
 This repository hosts the SparkRunner user app built with React Native CLI. It is the local entry point for testing the mobile UI while connecting to the orchestrator repo (auth-server-service + scooter mock via Docker Compose).
 
-## Test Coverage
-
-![Coverage](https://img.shields.io/badge/Coverage-73.02%25-brightgreen)
-![Statements](https://img.shields.io/badge/Statements-72.52%25-brightgreen)
-![Branches](https://img.shields.io/badge/Branches-58.37%25-yellow)
-![Functions](https://img.shields.io/badge/Functions-65.23%25-yellow)
-
-- **Lines**: 73.02% (1042/1427)
-- **Statements**: 72.52% (1061/1463)
-- **Branches**: 58.37% (568/973)
-- **Functions**: 65.23% (182/279)
-- **Test Suites**: 17 passed
-- **Tests**: 180 passed
-
-Run tests with coverage:
-```bash
-npm test -- --coverage
-```
-
 # Requirements
 
 - Node.js >= 20 (nvm recommended for version switching).

@@ -12,9 +12,6 @@ module.exports = function (api) {
       },
     ]);
   }
-  
-  // react-native-reanimated/plugin 必须是最后一个插件
-  plugins.push('react-native-reanimated/plugin');
 
   return {
     presets: ['module:@react-native/babel-preset'],
