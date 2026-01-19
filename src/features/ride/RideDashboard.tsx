@@ -225,8 +225,7 @@ export const RideDashboard = () => {
           {isLoading ? 'Avslutar...' : 'Avsluta resa'}
         </Text>
       </TouchableOpacity>
-      </ScrollView>
-
+      
       {__DEV__ && (
         <TouchableOpacity
           style={styles.testButton}
@@ -235,6 +234,7 @@ export const RideDashboard = () => {
           <Text style={styles.testButtonText}>Test GPS</Text>
         </TouchableOpacity>
       )}
+      </ScrollView>
 
       <LocationTestPanel
         visible={showTestPanel}
@@ -406,21 +406,13 @@ const styles = StyleSheet.create({
   },
   testButton: {
     position: 'absolute',
-    bottom: 20,
-    right: 20,
-    backgroundColor: '#FF6B6B',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    bottom: 4,
+    left: 0,
+    padding: 4,
   },
   testButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+    color: theme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '500',
   },
 });
