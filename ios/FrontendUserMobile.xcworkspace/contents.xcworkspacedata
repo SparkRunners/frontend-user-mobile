@@ -2,6 +2,9 @@
 <Workspace
    version = "1.0">
    <FileRef
+      location = "group:test-route.gpx">
+   </FileRef>
+   <FileRef
       location = "group:FrontendUserMobile.xcodeproj">
    </FileRef>
    <FileRef

@@ -273,44 +273,6 @@ const toCoordinate = (source?: GenericRecord): GeoCoordinate | null => {
   return { latitude, longitude };
 };
 
-const normalizeRuleType = (value?: string): ZoneRuleMatch['type'] => {
-  if (!value) {
-    return 'normal';
-  }
-  const normalized = value.toLowerCase();
-  if (normalized === 'no-go' || normalized === 'no_go') {
-    return 'no-go';
-  }
-  if (normalized === 'slow-speed' || normalized === 'slow_speed' || normalized === 'slow') {
-    return 'slow-speed';
-  }
-  if (normalized === 'parking') {
-    return 'parking';
-  }
-  if (normalized === 'charging') {
-    return 'charging';
-  }
-  return value as ZoneRuleMatch['type'];
-};
-
-const mapToZoneRuleMatch = (source?: GenericRecord | null): ZoneRuleMatch | null => {
-  if (!source) {
-    return null;
-  }
-  const type = normalizeRuleType(readString(source, 'rule', 'type', 'name'));
-  const priority = readNumber(source, 'priority', 'severity', 'weight') ?? 0;
-  const message = readString(source, 'message', 'description', 'label');
-  const speedLimit =
-    readNumber(source, 'speedLimitKmh', 'speed_limit_kmh', 'speedLimit', 'speed_limit');
-
-  return {
-    type,
-    priority,
-    message,
-    speedLimitKmh: speedLimit,
-  };
-};
-
 const mapToParkingHint = (source?: GenericRecord | null): ParkingHint | null => {
   if (!source) {
     return null;
@@ -353,30 +315,94 @@ const extractZoneRulePayload = (payload: unknown): GenericRecord | null => {
   return record;
 };
 
-const toArray = (value: unknown): GenericRecord[] =>
-  Array.isArray(value) ? (value as GenericRecord[]) : [];
-
 const mapZoneCheckResult = (payload: unknown): ZoneCheckResult => {
   const source = extractZoneRulePayload(payload);
   if (!source) {
     return { rule: null, nearestParking: null };
   }
 
-  const ruleCandidates: GenericRecord[] = [
-    ...toArray(source.rules),
-    ...toArray(source.violations),
-  ];
+  let rule: ZoneRuleMatch | null = null;
 
-  if (!ruleCandidates.length && (source.rule || source.type)) {
-    ruleCandidates.push(source);
+  // Handle legacy flat format: { rule: 'slow-speed', priority: 60, speedLimitKmh: 15 }
+  const legacyRuleType = readString(source, 'rule');
+  if (legacyRuleType) {
+    const priority = readNumber(source, 'priority') ?? 0;
+    const message = readString(source, 'message');
+    const speedLimitKmh = readNumber(source, 'speedLimitKmh', 'maxSpeed');
+    rule = {
+      type: legacyRuleType as ZoneRuleType,
+      priority,
+      message,
+      speedLimitKmh,
+    };
+  }
+  // Handle array of rules format: { rules: [{rule: 'slow-speed', priority: 40}, ...] }
+  else if (source.rules && Array.isArray(source.rules) && source.rules.length > 0) {
+    const sorted = [...source.rules].sort((a: GenericRecord, b: GenericRecord) => {
+      const aPriority = readNumber(a, 'priority') ?? 0;
+      const bPriority = readNumber(b, 'priority') ?? 0;
+      return bPriority - aPriority;
+    });
+    const highest = sorted[0] as GenericRecord;
+    const priority = readNumber(highest, 'priority') ?? 0;
+    const message = readString(highest, 'message');
+    const speedLimitKmh = readNumber(highest, 'speedLimitKmh', 'maxSpeed');
+    const ruleType = readString(highest, 'rule', 'type');
+    if (ruleType) {
+      rule = {
+        type: ruleType as ZoneRuleType,
+        priority,
+        message,
+        speedLimitKmh,
+      };
+    }
+  }
+  // Backend format: { inZone, rules: { parkAllowed, rideAllowed, maxSpeed, hasCharging }, alert }
+  else if (source.inZone === false || !source.rules) {
+    rule = null;
+  } else if (source.rules && typeof source.rules === 'object' && !Array.isArray(source.rules)) {
+    const rules = source.rules as GenericRecord;
+    const rideAllowed = rules.rideAllowed === true;
+    const parkAllowed = rules.parkAllowed === true;
+    const maxSpeed = readNumber(rules, 'maxSpeed');
+    const hasCharging = rules.hasCharging === true;
+
+    if (!rideAllowed) {
+      // No-go zone (riding not allowed within this zone)
+      rule = {
+        type: 'no-go',
+        priority: 100,
+        message: 'Du är i en förbjuden zon. Flytta skotern till tillåten plats.',
+        speedLimitKmh: undefined,
+      };
+    } else if (maxSpeed && maxSpeed > 0 && maxSpeed < 25) {
+      // Slow-speed zone (only if maxSpeed is positive and less than normal speed)
+      rule = {
+        type: 'slow-speed',
+        priority: 50,
+        message: `Låg-hastighetszon. Max hastighet: ${maxSpeed} km/h`,
+        speedLimitKmh: maxSpeed,
+      };
+    } else if (parkAllowed) {
+      // Parking zone
+      rule = {
+        type: 'parking',
+        priority: 30,
+        message: 'Du är i en parkeringszon.',
+        speedLimitKmh: undefined,
+      };
+    } else if (hasCharging) {
+      // Charging zone
+      rule = {
+        type: 'charging',
+        priority: 40,
+        message: 'Du är i en laddzon.',
+        speedLimitKmh: undefined,
+      };
+    }
   }
 
-  const orderedRules = ruleCandidates
-    .map(candidate => mapToZoneRuleMatch(candidate))
-    .filter((candidate): candidate is ZoneRuleMatch => Boolean(candidate))
-    .sort((a, b) => b.priority - a.priority);
-
-  const rule = orderedRules[0] ?? null;
+  // Backend doesn't provide nearestParking yet
   const nearestParking = mapToParkingHint(
     (source.nearestParking as GenericRecord | undefined) ??
       (source.nearest_parking as GenericRecord | undefined) ??
@@ -545,6 +571,7 @@ export const rideApi = {
     if (!scooterId) {
       throw new Error('Scooter-id krävs för att avsluta resan');
     }
+
     try {
       const response = await scooterApiClient.post<RentTripDto>(
         `${RENT_BASE_PATH}/stop/${encodeId(scooterId)}`,
