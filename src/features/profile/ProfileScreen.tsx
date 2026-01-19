@@ -1,164 +1,100 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Toast from 'react-native-toast-message';
+import { useAuth } from '../../auth';
 import { theme } from '../../theme';
-import { Ride } from '../ride';
-import { useRideHistory } from './useRideHistory';
-import { useBalance } from './useBalance';
 
-const formatDateTime = (iso: string) =>
-  new Date(iso).toLocaleString('sv-SE', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
+interface MenuItemProps {
+  title: string;
+  onPress: () => void;
+  isDestructive?: boolean;
+}
 
-const formatDuration = (seconds: number) => {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes} min ${remainingSeconds}s`;
-};
-
-const formatCurrency = (amount: number) => `${amount.toFixed(0)} kr`;
-
-const RideHistoryItem = ({ ride }: { ride: Ride }) => (
-  <View style={styles.historyItem}>
-    <View style={styles.historyHeader}>
-      <Text style={styles.historyTitle}>{formatDateTime(ride.startTime)}</Text>
-      <Text style={styles.historyCost}>{formatCurrency(ride.cost)}</Text>
-    </View>
-    <View style={styles.historyMetaRow}>
-      <Text style={styles.historyLabel}>Scooter</Text>
-      <Text style={styles.historyValue}>{ride.scooterId}</Text>
-    </View>
-    <View style={styles.historyMetaRow}>
-      <Text style={styles.historyLabel}>Varaktighet</Text>
-      <Text style={styles.historyValue}>{formatDuration(ride.durationSeconds)}</Text>
-    </View>
-    <View style={styles.historyStatusRow}>
-      <Text style={styles.statusBadge}>{ride.status === 'completed' ? 'Avslutad' : ride.status}</Text>
-    </View>
-  </View>
+const MenuItem: React.FC<MenuItemProps> = ({ title, onPress, isDestructive = false }) => (
+  <TouchableOpacity 
+    style={[styles.menuButton, isDestructive && styles.menuButtonDestructive]} 
+    onPress={onPress} 
+    activeOpacity={0.8}
+  >
+    <Text style={[styles.menuButtonText, isDestructive && styles.menuButtonTextDestructive]}>
+      {title}
+    </Text>
+  </TouchableOpacity>
 );
 
 export const ProfileScreen = () => {
-  const { rides, isLoading, error, refetch } = useRideHistory();
-  const { balance, isLoading: balanceLoading, error: balanceError, refetch: refetchBalance, fillup } = useBalance();
-  const [fillupAmount, setFillupAmount] = useState('');
-  const [isFilling, setIsFilling] = useState(false);
+  const { user, logout } = useAuth();
 
-  const handleFillup = async () => {
-    const amount = parseFloat(fillupAmount);
-    if (isNaN(amount) || amount <= 0) {
-      Alert.alert('Ogiltigt belopp', 'Ange ett giltigt belopp större än 0');
-      return;
-    }
+  const handleLogout = () => {
+    Alert.alert(
+      'Log out',
+      'Are you sure you want to log out?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log out',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+          },
+        },
+      ],
+    );
+  };
 
-    setIsFilling(true);
-    try {
-      await fillup(amount);
-      setFillupAmount('');
-      Toast.show({
-        type: 'success',
-        text1: 'Påfyllning lyckades',
-        text2: `${amount} kr har lagts till på ditt konto`,
-        position: 'bottom',
-      });
-    } catch (err) {
-      Alert.alert('Fel', err instanceof Error ? err.message : 'Kunde inte fylla på saldo');
-    } finally {
-      setIsFilling(false);
-    }
+  const handleMyTrips = () => {
+    Alert.alert('My trips', 'Ride history coming soon');
+  };
+
+  const handleMyAccount = () => {
+    Alert.alert('My account', 'Change name, password, email coming soon');
+  };
+
+  const handleMySaldo = () => {
+    Alert.alert('My saldo', 'Balance management coming soon');
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.title}>Min sida</Text>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Saldo</Text>
-            <TouchableOpacity onPress={refetchBalance} disabled={balanceLoading} style={styles.refreshButton}>
-              <Text style={styles.refreshButtonText}>{balanceLoading ? 'Laddar...' : 'Uppdatera'}</Text>
-            </TouchableOpacity>
+        {/* Header with user info */}
+        <View style={styles.header}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatarCircle} />
           </View>
-          {balanceError ? <Text style={styles.errorText}>{balanceError}</Text> : null}
-          {balanceLoading && balance === null ? (
-            <ActivityIndicator color={theme.colors.brand} style={styles.loader} testID="balance-loader" />
-          ) : (
-            <Text style={styles.balanceAmount} testID="balance-amount">
-              {balance !== null ? `${balance.toFixed(2)} kr` : 'Ej tillgängligt'}
-            </Text>
-          )}
+          <Text style={styles.username}>{user?.username || 'User'}</Text>
+          {user?.email && <Text style={styles.email}>{user.email}</Text>}
+        </View>
+
+        {/* Menu List */}
+        <View style={styles.menuList}>
+          <MenuItem
+            title="My trips"
+            onPress={handleMyTrips}
+          />
           
-          <View style={styles.fillupContainer}>
-            <TextInput
-              style={styles.fillupInput}
-              placeholder="Belopp att fylla på"
-              placeholderTextColor={theme.colors.textMuted}
-              keyboardType="numeric"
-              value={fillupAmount}
-              onChangeText={setFillupAmount}
-              editable={!isFilling}
-              testID="fillup-input"
-            />
-            <TouchableOpacity
-              style={[styles.fillupButton, (isFilling || !fillupAmount) && styles.fillupButtonDisabled]}
-              onPress={handleFillup}
-              disabled={isFilling || !fillupAmount}
-              testID="fillup-button"
-            >
-              <Text style={styles.fillupButtonText}>{isFilling ? 'Fyller på...' : 'Fyll på'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>My Trips</Text>
-            <TouchableOpacity onPress={refetch} disabled={isLoading} style={styles.refreshButton}>
-              <Text style={styles.refreshButtonText}>{isLoading ? 'Laddar...' : 'Uppdatera'}</Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.sectionDescription}>
-            Dina senaste resor listas här.
-          </Text>
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          {isLoading && rides.length === 0 ? (
-            <ActivityIndicator
-              color={theme.colors.brand}
-              style={styles.loader}
-              testID="ride-history-loader"
-            />
-          ) : null}
-          {!isLoading && rides.length === 0 ? (
-            <Text style={styles.emptyState} testID="ride-history-empty">
-              Du har inga resor ännu.
-            </Text>
-          ) : null}
-          {rides.map((ride, index) => (
-            <RideHistoryItem ride={ride} key={ride.id || `ride-${index}`} />
-          ))}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Vad fungerar nu?</Text>
-          <Text style={styles.sectionDescription}>
-            - Pågående resor styrs från kartan.
-            {'\n'}- Du kan avsluta en resa och se summeringen.
-            {'\n'}- Saldo och påfyllning kopplas nu mot backend API.
-            {'\n'}- Historiken hämtas från servern.
-          </Text>
+          <MenuItem
+            title="My account"
+            onPress={handleMyAccount}
+          />
+          
+          <MenuItem
+            title="My saldo"
+            onPress={handleMySaldo}
+          />
+          
+          <MenuItem
+            title="Log out"
+            onPress={handleLogout}
+            isDestructive
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -171,136 +107,57 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.background,
   },
   scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 24,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.xl,
+    paddingBottom: theme.spacing.xl,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 16,
-    color: theme.colors.text,
-  },
-  section: {
-    backgroundColor: theme.colors.card,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: theme.colors.text,
-  },
-  sectionDescription: {
-    color: theme.colors.textMuted,
-    lineHeight: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
+  header: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    paddingVertical: theme.spacing.xxl,
   },
-  refreshButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: theme.colors.background,
-    borderRadius: 16,
+  avatarContainer: {
+    marginBottom: theme.spacing.lg,
   },
-  refreshButtonText: {
-    color: theme.colors.brand,
-    fontWeight: '600',
+  avatarCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderWidth: 2,
+    borderColor: theme.colors.border,
   },
-  loader: {
-    marginVertical: 12,
-  },
-  emptyState: {
-    color: theme.colors.textMuted,
-    marginTop: 12,
-  },
-  errorText: {
-    color: theme.colors.danger,
-    marginTop: 8,
-  },
-  historyItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  historyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+  username: {
+    ...theme.typography.titleL,
     color: theme.colors.text,
-  },
-  historyCost: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  historyMetaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 2,
-  },
-  historyLabel: {
-    color: theme.colors.textMuted,
-  },
-  historyValue: {
-    color: theme.colors.text,
-    fontWeight: '500',
-  },
-  historyStatusRow: {
-    marginTop: 8,
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: theme.badges.success.background,
-    color: theme.badges.success.foreground,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    fontSize: 12,
+    marginBottom: 4,
     fontWeight: '600',
   },
-  balanceAmount: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: theme.colors.brand,
-    marginVertical: 8,
+  email: {
+    ...theme.typography.bodyM,
+    color: theme.colors.textSecondary,
   },
-  fillupContainer: {
-    marginTop: 16,
-    gap: 12,
+  menuList: {
+    gap: theme.spacing.md,
   },
-  fillupInput: {
-    backgroundColor: theme.colors.background,
+  menuButton: {
+    backgroundColor: theme.colors.brand,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.radii.control,
+    alignItems: 'center',
+    ...theme.shadows.small,
+  },
+  menuButtonDestructive: {
+    backgroundColor: theme.colors.card,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: theme.colors.text,
   },
-  fillupButton: {
-    backgroundColor: theme.colors.brand,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  fillupButtonDisabled: {
-    opacity: 0.5,
-  },
-  fillupButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  menuButtonText: {
+    ...theme.typography.bodyL,
+    color: theme.colors.card,
     fontWeight: '600',
+  },
+  menuButtonTextDestructive: {
+    color: theme.colors.danger,
   },
 });

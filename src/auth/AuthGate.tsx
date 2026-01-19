@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useAuth } from './AuthProvider';
-import { WelcomeScreen, SignInScreen, PasswordScreen } from './screens';
-import { loginWithEmail as loginWithEmailApi } from './api';
+import { WelcomeScreen, SignInScreen, PasswordScreen, SignUpScreen } from './screens';
+import { loginWithEmail as loginWithEmailApi, registerWithEmail as registerWithEmailApi } from './api';
 import { theme } from '../theme';
 import type { OAuthProviderName } from './types';
 
@@ -72,6 +72,33 @@ export const AuthGate = ({ children }: AuthGateProps) => {
     }
   };
 
+  const handleSignUp = async (data: { email: string; password: string; username: string; phone?: string }) => {
+    setIsLoading(true);
+    try {
+      await registerWithEmailApi({
+        email: data.email,
+        password: data.password,
+        username: data.username,
+      });
+      // Auto login after successful registration
+      const loginResponse = await loginWithEmailApi({ email: data.email, password: data.password });
+      await authenticateWithToken(loginResponse.token, { persist: true });
+      Toast.show({
+        type: 'success',
+        text1: 'Account created',
+        text2: 'Welcome to SparkRunner!',
+      });
+    } catch (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Sign up failed',
+        text2: error instanceof Error ? error.message : 'Something went wrong',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (currentScreen === 'welcome') {
     return (
       <WelcomeScreen
@@ -104,7 +131,16 @@ export const AuthGate = ({ children }: AuthGateProps) => {
     );
   }
 
-  // Placeholder for signup screen
+  if (currentScreen === 'signup') {
+    return (
+      <SignUpScreen
+        onBack={() => setCurrentScreen('welcome')}
+        onSignUp={handleSignUp}
+        isLoading={isLoading}
+      />
+    );
+  }
+
   return null;
 };
 

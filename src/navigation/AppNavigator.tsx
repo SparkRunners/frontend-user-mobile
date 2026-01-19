@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MapScreen } from '../features/map';
 import { ProfileScreen } from '../features/profile';
 import { theme } from '../theme';
@@ -19,7 +19,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 // Define HeaderRight component outside of render
 const HeaderRight = ({ onPress }: { onPress: () => void }) => (
   <TouchableOpacity onPress={onPress} style={styles.menuButton}>
-    <Text style={styles.menuButtonText}>Meny</Text>
+    <View style={styles.menuIconCircle} />
   </TouchableOpacity>
 );
 
@@ -30,10 +30,9 @@ export const AppNavigator = () => {
         <Stack.Screen
           name="Map"
           component={MapScreen}
-          options={({ navigation }) => ({
-            title: 'Karta',
-            headerRight: () => <HeaderRight onPress={() => navigation.navigate('Profile')} />,
-          })}
+          options={{
+            headerShown: false,
+          }}
         />
         <Stack.Screen
           name="Profile"
@@ -47,13 +46,19 @@ export const AppNavigator = () => {
 
 const styles = StyleSheet.create({
   menuButton: {
+    width: 40,
+    height: 40,
     backgroundColor: theme.colors.brand,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
     borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  menuButtonText: {
-    color: theme.colors.background,
-    fontWeight: '600',
+  menuIconCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: theme.colors.card,
+    borderWidth: 2,
+    borderColor: theme.colors.card,
   },
 });
