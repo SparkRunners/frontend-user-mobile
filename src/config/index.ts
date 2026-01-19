@@ -10,6 +10,8 @@ import {
   GOOGLE_CLIENT_SECRET,
   GOOGLE_REDIRECT_URI,
   SCOOTER_API_BASE_URL,
+  USE_SIMULATION,
+  SIMULATION_SOCKET_URL,
 } from '@env';
 
 const FALLBACK_ENV: AppEnvironment = 'mock';
@@ -45,6 +47,10 @@ export const runtimeConfig: RuntimeConfig = {
       baseUrl: ensureValue(AUTH_API_BASE_URL, 'AUTH_API_BASE_URL'),
       timeoutMs: DEFAULT_TIMEOUT_MS,
     },
+  },
+  simulation: {
+    enabled: USE_SIMULATION === 'true',
+    socketUrl: SIMULATION_SOCKET_URL ?? 'http://localhost:3000',
   },
   oauth: {
     frontendRedirectUrl: (() => {

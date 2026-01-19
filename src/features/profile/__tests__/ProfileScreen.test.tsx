@@ -1,87 +1,96 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import { NavigationContainer } from '@react-navigation/native';
 import { ProfileScreen } from '../ProfileScreen';
-import type { Ride } from '../../ride';
-import { useRideHistory } from '../useRideHistory';
-import { useBalance } from '../useBalance';
+import { useAuth } from '../../../auth';
 
-jest.mock('../useRideHistory');
-jest.mock('../useBalance');
+jest.mock('../../../auth');
 
-const mockUseRideHistory = useRideHistory as jest.MockedFunction<typeof useRideHistory>;
-const mockUseBalance = useBalance as jest.MockedFunction<typeof useBalance>;
+const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockNavigate = jest.fn();
 
-const sampleRide: Ride = {
-  id: 'ride-ui-1',
-  scooterId: 'SCOOT-500',
-  userId: 'user_123',
-  startTime: new Date(2024, 4, 1, 12, 12, 0).toISOString(),
-  endTime: new Date(2024, 4, 1, 12, 25, 0).toISOString(),
-  status: 'completed',
-  cost: 48,
-  durationSeconds: 780,
-};
+// Mock navigation
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native');
+  return {
+    ...actual,
+    useNavigation: () => ({
+      navigate: mockNavigate,
+    }),
+  };
+});
 
 describe('ProfileScreen', () => {
   beforeEach(() => {
-    mockUseRideHistory.mockReset();
-    mockUseBalance.mockReset();
+    jest.clearAllMocks();
     
-    // Default mock for useBalance
-    mockUseBalance.mockReturnValue({
-      balance: 150,
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-      fillup: jest.fn(),
+    // Default mock for useAuth
+    mockUseAuth.mockReturnValue({
+      user: { id: '1', username: 'testuser', email: 'test@example.com' },
+      logout: jest.fn(),
+      isReady: true,
+      isAuthenticated: true,
+      isAuthorizing: false,
+      token: 'fake-token',
+      login: jest.fn(),
+      authenticateWithToken: jest.fn(),
     });
   });
 
-  it('renders ride history items', () => {
-    mockUseRideHistory.mockReturnValue({
-      rides: [sampleRide],
-      isLoading: false,
-      error: null,
-      refetch: jest.fn(),
-    });
+  it('renders user profile information', () => {
+    const { getByText } = render(
+      <NavigationContainer>
+        <ProfileScreen />
+      </NavigationContainer>
+    );
 
-    const { getByText } = render(<ProfileScreen />);
-
-    expect(getByText('My Trips')).toBeTruthy();
-    expect(getByText('SCOOT-500')).toBeTruthy();
-    expect(getByText(/48 kr/)).toBeTruthy();
+    expect(getByText('testuser')).toBeTruthy();
+    expect(getByText('test@example.com')).toBeTruthy();
   });
 
-  it('shows loader and empty state when there are no rides yet', () => {
-    mockUseRideHistory.mockReturnValue({
-      rides: [],
-      isLoading: true,
-      error: null,
-      refetch: jest.fn(),
-    });
+  it('renders menu buttons', () => {
+    const { getByText } = render(
+      <NavigationContainer>
+        <ProfileScreen />
+      </NavigationContainer>
+    );
 
-    const { getByTestId } = render(<ProfileScreen />);
-
-    expect(getByTestId('ride-history-loader')).toBeTruthy();
+    expect(getByText('Mina resor')).toBeTruthy();
+    expect(getByText('Mitt konto')).toBeTruthy();
+    expect(getByText('Mitt saldo')).toBeTruthy();
+    expect(getByText('Logga ut')).toBeTruthy();
   });
 
-  it('invokes refetch when tapping Uppdatera and displays errors', () => {
-    const refetch = jest.fn();
-    mockUseRideHistory.mockReturnValue({
-      rides: [],
-      isLoading: false,
-      error: 'Oops',
-      refetch,
-    });
+  it('navigates to trip history when tapping Mina resor', () => {
+    const { getByText } = render(
+      <NavigationContainer>
+        <ProfileScreen />
+      </NavigationContainer>
+    );
 
-    const { getAllByText, getByText } = render(<ProfileScreen />);
+    fireEvent.press(getByText('Mina resor'));
+    expect(mockNavigate).toHaveBeenCalledWith('TripHistory');
+  });
 
-    // Get all "Uppdatera" buttons and press the last one (ride history)
-    const updateButtons = getAllByText('Uppdatera');
-    fireEvent.press(updateButtons[updateButtons.length - 1]);
-    
-    expect(refetch).toHaveBeenCalled();
-    expect(getByText('Oops')).toBeTruthy();
-    expect(getByText('Du har inga resor ännu.')).toBeTruthy();
+  it('navigates to account screen when tapping Mitt konto', () => {
+    const { getByText } = render(
+      <NavigationContainer>
+        <ProfileScreen />
+      </NavigationContainer>
+    );
+
+    fireEvent.press(getByText('Mitt konto'));
+    expect(mockNavigate).toHaveBeenCalledWith('Account');
+  });
+
+  it('navigates to balance screen when tapping Mitt saldo', () => {
+    const { getByText } = render(
+      <NavigationContainer>
+        <ProfileScreen />
+      </NavigationContainer>
+    );
+
+    fireEvent.press(getByText('Mitt saldo'));
+    expect(mockNavigate).toHaveBeenCalledWith('Balance');
   });
 });

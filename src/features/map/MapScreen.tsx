@@ -2,6 +2,10 @@ import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import { ActivityIndicator, StyleSheet, View, Text, TouchableOpacity, Alert } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, Marker, Polygon } from 'react-native-maps';
 import ClusteredMapView from 'react-native-map-clustering';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../navigation/AppNavigator';
 import { theme } from '../../theme';
 import { Scooter } from '../scooters/api';
 import { ScanScreen } from '../scan';
@@ -11,6 +15,7 @@ import { useZones } from './zones/useZones';
 import { usePricing } from '../pricing/usePricing';
 import { useScootersFeed } from '../scooters/useScootersFeed';
 import type { ZoneCity } from './zones/types';
+import { UserIcon } from '../../components/icons';
 
 const STOCKHOLM_REGION = {
   latitude: 59.3293,
@@ -45,7 +50,7 @@ const polygonStyleByType = {
   'parking': {
     strokeColor: 'rgba(34,197,94,0.9)',
     fillColor: 'rgba(34,197,94,0.2)',
-    dashPattern: [8, 6],
+    dashPattern: [8, 6] as number[],
     zIndexBase: 10,
   },
   'slow-speed': {
@@ -75,11 +80,14 @@ const formatPrice = (value: number, currency: string) => {
 };
 
 export const MapScreen = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const mapRef = useRef<MapView | null>(null);
   const [selectedScooter, setSelectedScooter] = useState<Scooter | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [mapRegion, setMapRegion] = useState(STOCKHOLM_REGION);
   const [selectedCity, setSelectedCity] = useState<ZoneCity>('Stockholm');
-  const mapRef = useRef<MapView | null>(null);
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [_searchAddress, _setSearchAddress] = useState('');
   const { startRide, isRiding, isLoading: rideIsLoading } = useRide();
   const {
     parkingZones,
@@ -101,7 +109,7 @@ export const MapScreen = () => {
     isLoading: scootersLoading,
     error: scootersError,
     refetch: refetchScooters,
-  } = useScootersFeed();
+  } = useScootersFeed({ viewport: mapRegion });
 
   const normalizeStatus = useCallback((status?: string | null) => status?.toLowerCase().trim() ?? '', []);
   const availableScooters = useMemo(
@@ -111,7 +119,6 @@ export const MapScreen = () => {
 
   const hasScootersAvailable = availableScooters.length > 0;
   const shouldShowInitialLoader = scootersLoading && !hasScootersAvailable && !scootersError;
-  const isScanDisabled = scootersLoading && !hasScootersAvailable;
 
   useEffect(() => {
     if (selectedScooter && !availableScooters.some(scooter => scooter.id === selectedScooter.id)) {
@@ -240,7 +247,7 @@ export const MapScreen = () => {
   const handleZoomOut = useCallback(() => adjustZoom(1 / ZOOM_FACTOR), [adjustZoom]);
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {showScanner ? (
         <ScanScreen
           onClose={() => setShowScanner(false)}
@@ -259,6 +266,14 @@ export const MapScreen = () => {
         />
       ) : (
         <>
+          {/* Account button - top left */}
+          <TouchableOpacity 
+            style={styles.accountButton}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <UserIcon size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+
           <ClusteredMapView
             ref={mapRef}
             testID="map-view"
@@ -281,7 +296,6 @@ export const MapScreen = () => {
             animationEnabled={true}
             layoutAnimationConf={{
               duration: 300,
-              type: 'spring',
             }}
           >
             {zonePolygons.map(zone =>
@@ -309,11 +323,10 @@ export const MapScreen = () => {
               if (typeof latitude !== 'number' || typeof longitude !== 'number') {
                 return null;
               }
-              const markerKey = scooter.id ?? index;
 
               return (
                 <Marker
-                  key={`${markerKey}-${latitude}-${longitude}`}
+                  key={scooter.id ?? index}
                   testID={`marker-${scooter.id}`}
                   coordinate={{
                     latitude,
@@ -326,10 +339,12 @@ export const MapScreen = () => {
                     setSelectedScooter(scooter);
                   }}
                 >
-                  <View style={[
-                    styles.marker,
-                    selectedScooter?.id === scooter.id && styles.markerSelected
-                  ]}>
+                  <View
+                    style={[
+                      styles.marker,
+                      selectedScooter?.id === scooter.id && styles.markerSelected,
+                    ]}
+                  >
                     <View style={styles.markerIcon} />
                   </View>
                 </Marker>
@@ -337,28 +352,22 @@ export const MapScreen = () => {
             })}
           </ClusteredMapView>
 
-          {isRiding ? (
-            <RideDashboard />
-          ) : (
-            !selectedScooter && (
-              <TouchableOpacity
-                testID="scan-button"
-                style={[
-                  styles.scanButton,
-                  isScanDisabled && styles.scanButtonDisabled,
-                ]}
+          {!isRiding && (
+            <View style={styles.bottomSheet}>
+              <View style={styles.sheetHandle} />
+              <TouchableOpacity 
+                style={styles.scanButton}
                 onPress={() => setShowScanner(true)}
-                disabled={isScanDisabled}
-                accessibilityState={{ disabled: isScanDisabled }}
+                testID="scan-button"
               >
-                <Text style={styles.scanButtonText}>
-                  {isScanDisabled ? 'Hämtar...' : 'Skanna'}
-                </Text>
+                <Text style={styles.scanButtonText}>Skanna</Text>
               </TouchableOpacity>
-            )
+            </View>
           )}
 
-          {shouldShowInitialLoader ? (
+          {isRiding && <RideDashboard />}
+
+        {shouldShowInitialLoader ? (
             <View style={styles.feedLoadingContainer} testID="scooter-feed-loading">
               <ActivityIndicator color={theme.colors.brand} size="small" />
               <Text style={styles.feedLoadingText}>Hämtar skotrar...</Text>
@@ -376,41 +385,55 @@ export const MapScreen = () => {
             </TouchableOpacity>
           ) : null}
 
-          <View style={styles.legendContainer} testID="zone-legend">
-            <View style={styles.legendRow}>
-              <View style={[styles.legendSwatch, styles.parkingSwatch]} />
-              <Text style={styles.legendLabel}>Parkeringszon</Text>
-            </View>
-            <View style={styles.legendRow}>
-              <View style={[styles.legendSwatch, styles.chargingSwatch]} />
-              <Text style={styles.legendLabel}>Laddstation</Text>
-            </View>
-            <View style={styles.legendRow}>
-              <View style={[styles.legendSwatch, styles.slowSwatch]} />
-              <Text style={styles.legendLabel}>Låg hastighet</Text>
-            </View>
-            <View style={styles.legendRow}>
-              <View style={[styles.legendSwatch, styles.noGoSwatch]} />
-              <Text style={styles.legendLabel}>Förbjuden zon</Text>
-            </View>
+          <View style={styles.topRightControls}>
+            <TouchableOpacity
+              style={styles.citySelectorButton}
+              onPress={() => setShowCityDropdown(!showCityDropdown)}
+              testID="city-selector-button"
+            >
+              <Text style={styles.citySelectorText}>{selectedCity}</Text>
+              <Text style={styles.citySelectorArrow}>{showCityDropdown ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+
+            {showCityDropdown && (
+              <View style={styles.cityDropdown} testID="city-dropdown">
+                {CITY_OPTIONS.map(cityOption => {
+                  const isActive = cityOption === selectedCity;
+                  return (
+                    <TouchableOpacity
+                      key={cityOption}
+                      style={[styles.cityDropdownItem, isActive && styles.cityDropdownItemActive]}
+                      onPress={() => {
+                        setSelectedCity(cityOption);
+                        setShowCityDropdown(false);
+                      }}
+                      testID={`city-option-${cityOption}`}
+                    >
+                      <Text style={[styles.cityDropdownText, isActive && styles.cityDropdownTextActive]}>
+                        {cityOption}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </View>
 
-          <View style={styles.citySelector} testID="city-selector">
-            {CITY_OPTIONS.map(cityOption => {
-              const isActive = cityOption === selectedCity;
-              return (
-                <TouchableOpacity
-                  key={cityOption}
-                  style={[styles.cityChip, isActive && styles.cityChipActive]}
-                  onPress={() => setSelectedCity(cityOption)}
-                  accessibilityState={{ selected: isActive }}
-                >
-                  <Text style={[styles.cityChipLabel, isActive && styles.cityChipLabelActive]}>
-                    {cityOption}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.zoomControls} testID="zoom-controls">
+            <TouchableOpacity
+              style={styles.zoomButton}
+              onPress={handleZoomIn}
+              testID="zoom-in-button"
+            >
+              <Text style={styles.zoomLabel}>+</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.zoomButton}
+              onPress={handleZoomOut}
+              testID="zoom-out-button"
+            >
+              <Text style={styles.zoomLabel}>-</Text>
+            </TouchableOpacity>
           </View>
 
           {zonesLoading ? (
@@ -430,23 +453,6 @@ export const MapScreen = () => {
               <Text style={styles.zoneRetryText}>Tryck för att hämta zoner igen</Text>
             </TouchableOpacity>
           ) : null}
-
-          <View style={styles.zoomControls} testID="zoom-controls">
-            <TouchableOpacity
-              style={styles.zoomButton}
-              onPress={handleZoomIn}
-              testID="zoom-in-button"
-            >
-              <Text style={styles.zoomLabel}>+</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.zoomButton}
-              onPress={handleZoomOut}
-              testID="zoom-out-button"
-            >
-              <Text style={styles.zoomLabel}>-</Text>
-            </TouchableOpacity>
-          </View>
 
           {selectedScooter && (
             <View style={styles.bottomSheet}>
@@ -527,7 +533,7 @@ export const MapScreen = () => {
       )}
       
       <TripSummary />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -535,6 +541,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: theme.colors.background,
+  },
+  accountButton: {
+    position: 'absolute',
+    top: 60,
+    left: 16,
+    width: 44,
+    height: 44,
+    backgroundColor: theme.colors.card,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    ...theme.shadows.small,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
@@ -571,27 +590,80 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'white',
+    backgroundColor: theme.colors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    padding: 24,
+    paddingHorizontal: theme.spacing.xl,
+    paddingTop: theme.spacing.md,
     paddingBottom: 40,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    ...theme.shadows.large,
   },
-  handle: {
-    width: 40,
+  sheetHandle: {
+    width: 36,
     height: 4,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: theme.colors.border,
     borderRadius: 2,
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: theme.spacing.lg,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    backgroundColor: theme.colors.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: theme.spacing.lg,
+  },
+  sheetTitle: {
+    ...theme.typography.titleL,
+    color: theme.colors.text,
+    marginBottom: theme.spacing.xl,
+    textAlign: 'center',
+  },
+  scanButton: {
+    backgroundColor: theme.colors.brand,
+    paddingVertical: theme.spacing.lg,
+    paddingHorizontal: theme.spacing.xl,
+    borderRadius: theme.radii.control,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scanButtonText: {
+    ...theme.typography.bodyM,
+    color: 'white',
+    fontWeight: '600',
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 12,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111827',
+  },
+  actionButton: {
+    backgroundColor: theme.colors.brand,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   pricingCard: {
     backgroundColor: theme.colors.background,
@@ -654,7 +726,7 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
   },
   pricingErrorContainer: {
-    backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.08)',
+    backgroundColor: 'rgba(220,38,38,0.08)',
     padding: 12,
     borderRadius: 12,
   },
@@ -672,7 +744,7 @@ const styles = StyleSheet.create({
     bottom: 110,
     left: 20,
     right: 20,
-    backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.15)',
+    backgroundColor: 'rgba(220,38,38,0.15)',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
@@ -711,122 +783,75 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     color: '#111827',
   },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-    padding: 12,
-    borderRadius: 12,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  actionButton: {
-    backgroundColor: '#4ADE80',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  scanButton: {
+  topRightControls: {
     position: 'absolute',
-    bottom: 40,
-    alignSelf: 'center',
+    top: 60,
+    right: 16,
+    gap: 10,
+  },
+  citySelectorButton: {
     backgroundColor: theme.colors.brand,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  scanButtonDisabled: {
-    backgroundColor: theme.colors.border,
-  },
-  scanButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  legendContainer: {
-    position: 'absolute',
-    top: 24,
-    left: 16,
-    backgroundColor: 'rgba(17, 24, 39, 0.8)',
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    gap: 8,
-  },
-  legendRow: {
+    paddingVertical: 8,
+    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    minWidth: 120,
+    gap: 6,
   },
-  legendSwatch: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 2,
-  },
-  legendLabel: {
-    color: 'white',
+  citySelectorText: {
+    color: '#FFFFFF',
+    fontSize: 13,
     fontWeight: '600',
-    fontSize: 12,
   },
-  parkingSwatch: {
-    backgroundColor: 'rgba(34,197,94,0.18)',
-    borderColor: 'rgba(34,197,94,0.9)',
+  citySelectorArrow: {
+    color: '#FFFFFF',
+    fontSize: 10,
   },
-  chargingSwatch: {
-    backgroundColor: 'rgba(59,130,246,0.25)',
-    borderColor: 'rgba(59,130,246,0.95)',
+  cityDropdown: {
+    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
-  slowSwatch: {
-    backgroundColor: 'rgba(251,191,36,0.25)',
-    borderColor: 'rgba(251,191,36,0.95)',
+  cityDropdownItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
-  noGoSwatch: {
-    backgroundColor: 'rgba(248,113,113,0.35)',
-    borderColor: 'rgba(248,113,113,0.95)',
+  cityDropdownItemActive: {
+    backgroundColor: theme.colors.brand,
+  },
+  cityDropdownText: {
+    color: '#F3F4F6',
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  cityDropdownTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   zoomControls: {
     position: 'absolute',
-    bottom: 140,
-    right: 20,
-    backgroundColor: 'rgba(17, 24, 39, 0.85)',
-    borderRadius: 12,
-    padding: 8,
-    gap: 8,
+    right: 16,
+    top: '20%',
+    marginTop: -40,
+    gap: 6,
   },
   zoomButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: 'rgba(17, 24, 39, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   zoomLabel: {
     color: '#fff',
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: '700',
   },
   chargingMarker: {
@@ -843,29 +868,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '700',
     fontSize: 14,
-  },
-  citySelector: {
-    position: 'absolute',
-    top: 24,
-    right: 16,
-    flexDirection: 'row',
-    gap: 8,
-  },
-  cityChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  cityChipActive: {
-    backgroundColor: theme.colors.brand,
-  },
-  cityChipLabel: {
-    color: '#F3F4F6',
-    fontWeight: '600',
-  },
-  cityChipLabelActive: {
-    color: '#fff',
   },
   zoneStatusChip: {
     position: 'absolute',
@@ -889,7 +891,7 @@ const styles = StyleSheet.create({
     top: 120,
     right: 16,
     left: 16,
-    backgroundColor: theme.colors.dangerMuted ?? 'rgba(220,38,38,0.15)',
+    backgroundColor: 'rgba(220,38,38,0.15)',
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,

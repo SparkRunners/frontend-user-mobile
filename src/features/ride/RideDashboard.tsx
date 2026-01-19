@@ -1,10 +1,19 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView, Dimensions } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, runOnJS } from 'react-native-reanimated';
 import { useRide } from './RideProvider';
 import { useRideZoneRules } from './useZoneRules';
+import { LocationTestPanel } from './LocationTestPanel';
 import { theme } from '../../theme';
 
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const DISMISS_THRESHOLD = 100; // 下滑超过100px就关闭
+
 export const RideDashboard = () => {
+  const [showTestPanel, setShowTestPanel] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const translateY = useSharedValue(0);
   const { durationSeconds, currentCost, endRide, isLoading, isRiding } = useRide();
   const {
     rule: zoneRule,
@@ -86,6 +95,34 @@ export const RideDashboard = () => {
     return rows.join('\n\n');
   };
 
+  const panGesture = Gesture.Pan()
+    .onUpdate((event) => {
+      // 只允许向下滑动
+      if (event.translationY > 0) {
+        translateY.value = event.translationY;
+      }
+    })
+    .onEnd((event) => {
+      if (event.translationY > DISMISS_THRESHOLD) {
+        // 滑动超过阈值，最小化面板
+        translateY.value = withSpring(SCREEN_HEIGHT * 0.5, {}, () => {
+          runOnJS(setIsMinimized)(true);
+        });
+      } else {
+        // 回弹
+        translateY.value = withSpring(0);
+      }
+    });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  const handleExpand = () => {
+    setIsMinimized(false);
+    translateY.value = withSpring(0);
+  };
+
   const handleEndRide = () => {
     Alert.alert(
       'Avsluta resa',
@@ -111,20 +148,42 @@ export const RideDashboard = () => {
     );
   };
 
-  return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        testID="zone-status-banner"
-        style={[
-          styles.zoneBanner,
-          zoneSeverity === 'danger' && styles.zoneBannerDanger,
-          zoneSeverity === 'warning' && styles.zoneBannerWarning,
-          zoneSeverity === 'neutral' && styles.zoneBannerNeutral,
-        ]}
-        onPress={forceRefresh}
-        activeOpacity={0.9}
-        accessibilityRole="button"
+  if (isMinimized) {
+    return (
+      <TouchableOpacity 
+        style={styles.minimizedContainer}
+        onPress={handleExpand}
+        activeOpacity={0.8}
       >
+        <View style={styles.minimizedHandle} />
+        <Text style={styles.minimizedText}>Pågående resa - {formatTime(durationSeconds)}</Text>
+        <Text style={styles.minimizedCost}>{currentCost.toFixed(2)} kr</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <GestureDetector gesture={panGesture}>
+      <Animated.View style={[styles.container, animatedStyle]}>
+        <View style={styles.dragHandle} />
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={true}
+        >
+        <TouchableOpacity
+          testID="zone-status-banner"
+          style={[
+            styles.zoneBanner,
+            zoneSeverity === 'danger' && styles.zoneBannerDanger,
+            zoneSeverity === 'warning' && styles.zoneBannerWarning,
+            zoneSeverity === 'neutral' && styles.zoneBannerNeutral,
+          ]}
+          onPress={forceRefresh}
+          activeOpacity={0.9}
+          accessibilityRole="button"
+        >
         <View style={styles.zoneBannerHeader}>
           <Text style={styles.zoneBannerTitle}>{zoneTitle}</Text>
           {isChecking ? (
@@ -166,7 +225,23 @@ export const RideDashboard = () => {
           {isLoading ? 'Avslutar...' : 'Avsluta resa'}
         </Text>
       </TouchableOpacity>
-    </View>
+      
+      {__DEV__ && (
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={() => setShowTestPanel(true)}
+        >
+          <Text style={styles.testButtonText}>Test GPS</Text>
+        </TouchableOpacity>
+      )}
+      </ScrollView>
+
+      <LocationTestPanel
+        visible={showTestPanel}
+        onClose={() => setShowTestPanel(false)}
+      />
+      </Animated.View>
+    </GestureDetector>
   );
 };
 
@@ -176,30 +251,75 @@ const styles = StyleSheet.create({
     bottom: 40,
     left: 20,
     right: 20,
+    maxHeight: '60%',
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radii.card,
+    ...theme.shadows.soft,
+  },
+  dragHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: theme.colors.border,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  minimizedContainer: {
+    position: 'absolute',
+    bottom: 40,
+    left: 20,
+    right: 20,
     backgroundColor: theme.colors.card,
     borderRadius: theme.radii.card,
     padding: theme.spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     ...theme.shadows.soft,
   },
+  minimizedHandle: {
+    width: 4,
+    height: 40,
+    backgroundColor: theme.colors.brand,
+    borderRadius: 2,
+    marginRight: theme.spacing.md,
+  },
+  minimizedText: {
+    flex: 1,
+    ...theme.typography.bodyM,
+    color: theme.colors.text,
+    fontWeight: '600',
+  },
+  minimizedCost: {
+    ...theme.typography.titleM,
+    color: theme.colors.brand,
+    fontWeight: '700',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: theme.spacing.xl,
+    paddingBottom: theme.spacing.lg,
+  },
   zoneBanner: {
-    borderRadius: theme.radii.card,
-    padding: theme.spacing.md,
-    marginBottom: theme.spacing.lg,
+    borderRadius: 16,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+    borderWidth: 1,
   },
   zoneBannerDanger: {
     backgroundColor: '#FEE2E2',
-    borderColor: theme.colors.danger,
-    borderWidth: 1,
+    borderColor: '#FECACA',
   },
   zoneBannerWarning: {
     backgroundColor: '#FEF3C7',
-    borderColor: '#FBBF24',
-    borderWidth: 1,
+    borderColor: '#FDE68A',
   },
   zoneBannerNeutral: {
-    backgroundColor: theme.colors.background,
+    backgroundColor: theme.colors.backgroundSecondary,
     borderColor: theme.colors.border,
-    borderWidth: 1,
   },
   zoneBannerHeader: {
     flexDirection: 'row',
@@ -208,63 +328,91 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   zoneBannerTitle: {
-    ...theme.typography.bodyM,
-    fontWeight: '600',
+    ...theme.typography.titleM,
     color: theme.colors.text,
+    marginBottom: 2,
   },
   zoneBannerMeta: {
     ...theme.typography.caption,
-    color: theme.colors.textMuted,
+    color: theme.colors.textSecondary,
   },
   zoneBannerMessage: {
-    ...theme.typography.bodyM,
-    color: theme.colors.text,
-    marginBottom: 4,
+    ...theme.typography.bodyS,
+    color: theme.colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: 8,
   },
   zoneBannerDetail: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
+    marginTop: 4,
   },
   zoneBannerAction: {
     ...theme.typography.caption,
     color: theme.colors.brand,
-    marginTop: 6,
+    marginTop: 8,
     fontWeight: '600',
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: theme.spacing.lg,
+    backgroundColor: theme.colors.backgroundSecondary,
+    borderRadius: 16,
+    padding: theme.spacing.lg,
+    marginBottom: theme.spacing.xl,
+    gap: theme.spacing.lg,
   },
   statItem: {
+    flex: 1,
     alignItems: 'center',
   },
   statLabel: {
     ...theme.typography.caption,
     color: theme.colors.textMuted,
-    marginBottom: 4,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   statValue: {
     ...theme.typography.titleL,
     color: theme.colors.text,
     fontVariant: ['tabular-nums'],
+    fontWeight: '700',
   },
   divider: {
     width: 1,
     backgroundColor: theme.colors.border,
+    alignSelf: 'stretch',
   },
   endButton: {
     backgroundColor: theme.colors.danger,
-    paddingVertical: theme.spacing.md,
-    borderRadius: theme.radii.control,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: theme.colors.danger,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   buttonDisabled: {
-    opacity: 0.7,
+    opacity: 0.6,
   },
   endButtonText: {
     ...theme.typography.bodyM,
-    color: 'white',
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 17,
+  },
+  testButton: {
+    position: 'absolute',
+    bottom: 4,
+    left: 0,
+    padding: 4,
+  },
+  testButtonText: {
+    color: theme.colors.textMuted,
+    fontSize: 10,
+    fontWeight: '500',
   },
 });
