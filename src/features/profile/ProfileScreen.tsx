@@ -8,8 +8,14 @@ import {
   Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../navigation/AppNavigator';
 import { useAuth } from '../../auth';
 import { theme } from '../../theme';
+import { UserIcon } from '../../components/icons/UserIcon';
+
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 interface MenuItemProps {
   title: string;
@@ -30,16 +36,17 @@ const MenuItem: React.FC<MenuItemProps> = ({ title, onPress, isDestructive = fal
 );
 
 export const ProfileScreen = () => {
+  const navigation = useNavigation<NavigationProp>();
   const { user, logout } = useAuth();
 
   const handleLogout = () => {
     Alert.alert(
-      'Log out',
-      'Are you sure you want to log out?',
+      'Logga ut',
+      'Är du säker på att du vill logga ut?',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Avbryt', style: 'cancel' },
         {
-          text: 'Log out',
+          text: 'Logga ut',
           style: 'destructive',
           onPress: async () => {
             await logout();
@@ -50,48 +57,54 @@ export const ProfileScreen = () => {
   };
 
   const handleMyTrips = () => {
-    Alert.alert('My trips', 'Ride history coming soon');
+    navigation.navigate('TripHistory');
   };
 
   const handleMyAccount = () => {
-    Alert.alert('My account', 'Change name, password, email coming soon');
+    navigation.navigate('Account');
   };
 
   const handleMySaldo = () => {
-    Alert.alert('My saldo', 'Balance management coming soon');
+    navigation.navigate('Balance');
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Header with user info */}
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content}>
+        {/* Header */}
         <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatarCircle} />
+          <View style={styles.iconContainer}>
+            <UserIcon size={48} color={theme.colors.text} />
           </View>
-          <Text style={styles.username}>{user?.username || 'User'}</Text>
-          {user?.email && <Text style={styles.email}>{user.email}</Text>}
+          <Text style={styles.name}>{user?.username || 'Användare'}</Text>
+          <Text style={styles.email}>{user?.email || ''}</Text>
         </View>
 
         {/* Menu List */}
         <View style={styles.menuList}>
-          <MenuItem
-            title="My trips"
+          <TouchableOpacity 
+            style={styles.menuButton} 
             onPress={handleMyTrips}
-          />
+            activeOpacity={0.8}
+          >
+            <Text style={styles.menuButtonText}>Mina resor</Text>
+          </TouchableOpacity>
           
           <MenuItem
-            title="My account"
+            title="Mitt konto"
             onPress={handleMyAccount}
           />
           
-          <MenuItem
-            title="My saldo"
+          <TouchableOpacity 
+            style={styles.menuButton} 
             onPress={handleMySaldo}
-          />
+            activeOpacity={0.8}
+          >
+            <Text style={styles.menuButtonText}>Mitt saldo</Text>
+          </TouchableOpacity>
           
           <MenuItem
-            title="Log out"
+            title="Logga ut"
             onPress={handleLogout}
             isDestructive
           />
@@ -106,7 +119,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  scrollContent: {
+  content: {
     paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.xl,
     paddingBottom: theme.spacing.xl,
@@ -114,6 +127,9 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     paddingVertical: theme.spacing.xxl,
+  },
+  iconContainer: {
+    marginBottom: theme.spacing.lg,
   },
   avatarContainer: {
     marginBottom: theme.spacing.lg,
@@ -125,6 +141,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.backgroundSecondary,
     borderWidth: 2,
     borderColor: theme.colors.border,
+  },
+  name: {
+    ...theme.typography.titleL,
+    color: theme.colors.text,
+    marginBottom: 4,
+    fontWeight: '600',
   },
   username: {
     ...theme.typography.titleL,
@@ -147,13 +169,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...theme.shadows.small,
   },
+  menuButtonContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+  },
+  menuButtonBadge: {
+    ...theme.typography.bodyM,
+    color: 'white',
+    fontWeight: '700',
+  },
   menuButtonDestructive: {
     backgroundColor: theme.colors.card,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
   menuButtonText: {
-    ...theme.typography.bodyL,
+    ...theme.typography.bodyM,
     color: theme.colors.card,
     fontWeight: '600',
   },

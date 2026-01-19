@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { useAuth } from './AuthProvider';
@@ -18,6 +18,14 @@ export const AuthGate = ({ children }: AuthGateProps) => {
   const [currentScreen, setCurrentScreen] = useState<AuthScreen>('welcome');
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
+
+  // Reset to welcome screen when user logs out
+  useEffect(() => {
+    if (!isAuthenticated && isReady && !isAuthorizing) {
+      setCurrentScreen('welcome');
+      setEmail('');
+    }
+  }, [isAuthenticated, isReady, isAuthorizing]);
 
   if (!isReady || isAuthorizing) {
     return (

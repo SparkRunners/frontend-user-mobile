@@ -15,6 +15,7 @@ import { useZones } from './zones/useZones';
 import { usePricing } from '../pricing/usePricing';
 import { useScootersFeed } from '../scooters/useScootersFeed';
 import type { ZoneCity } from './zones/types';
+import { UserIcon } from '../../components/icons';
 
 const STOCKHOLM_REGION = {
   latitude: 59.3293,
@@ -270,7 +271,7 @@ export const MapScreen = () => {
             style={styles.accountButton}
             onPress={() => navigation.navigate('Profile')}
           >
-            <View style={styles.accountIconCircle} />
+            <UserIcon size={24} color={theme.colors.text} />
           </TouchableOpacity>
 
           <ClusteredMapView
@@ -554,14 +555,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
     ...theme.shadows.small,
   },
-  accountIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: theme.colors.backgroundSecondary,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-  },
   map: {
     ...StyleSheet.absoluteFillObject,
   },
@@ -844,7 +837,7 @@ const styles = StyleSheet.create({
   zoomControls: {
     position: 'absolute',
     right: 16,
-    top: '50%',
+    top: '20%',
     marginTop: -40,
     gap: 6,
   },

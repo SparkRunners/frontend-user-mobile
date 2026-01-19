@@ -36,20 +36,20 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.secondaryButton}
+            style={styles.primaryButton}
             onPress={onSignUp}
             activeOpacity={0.8}
           >
-            <Text style={styles.secondaryButtonText}>Create account</Text>
+            <Text style={styles.primaryButtonText}>Create account</Text>
           </TouchableOpacity>
 
           {onSkip && (
             <TouchableOpacity
-              style={styles.skipButton}
+              style={styles.secondaryButton}
               onPress={onSkip}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
             >
-              <Text style={styles.skipButtonText}>Take a tour</Text>
+              <Text style={styles.secondaryButtonText}>Explore the app</Text>
             </TouchableOpacity>
           )}
         </View>

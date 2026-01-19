@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   termsText: {
-    ...theme.typography.bodyXS,
+    ...theme.typography.bodyS,
     color: theme.colors.textSecondary,
     textAlign: 'center',
     marginTop: 8,
