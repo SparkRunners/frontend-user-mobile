@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRide } from './RideProvider';
 import { useRideZoneRules } from './useZoneRules';
+import { LocationTestPanel } from './LocationTestPanel';
 import { theme } from '../../theme';
 
 export const RideDashboard = () => {
+  const [showTestPanel, setShowTestPanel] = useState(false);
   const { durationSeconds, currentCost, endRide, isLoading, isRiding } = useRide();
   const {
     rule: zoneRule,
@@ -166,6 +168,20 @@ export const RideDashboard = () => {
           {isLoading ? 'Avslutar...' : 'Avsluta resa'}
         </Text>
       </TouchableOpacity>
+
+      {__DEV__ && (
+        <TouchableOpacity
+          style={styles.testButton}
+          onPress={() => setShowTestPanel(true)}
+        >
+          <Text style={styles.testButtonText}>🧪 Test GPS</Text>
+        </TouchableOpacity>
+      )}
+
+      <LocationTestPanel
+        visible={showTestPanel}
+        onClose={() => setShowTestPanel(false)}
+      />
     </View>
   );
 };
@@ -265,6 +281,20 @@ const styles = StyleSheet.create({
   endButtonText: {
     ...theme.typography.bodyM,
     color: 'white',
+    fontWeight: '600',
+  },
+  testButton: {
+    marginTop: theme.spacing.sm,
+    backgroundColor: '#FFF3CD',
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radii.control,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFC107',
+  },
+  testButtonText: {
+    fontSize: 14,
+    color: '#856404',
     fontWeight: '600',
   },
 });
