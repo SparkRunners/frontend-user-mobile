@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { View, TouchableOpacity } from 'react-native';
 import { MapScreen } from '../MapScreen';
 import type { ZoneCity } from '../zones/types';
 
@@ -7,12 +8,12 @@ import type { ZoneCity } from '../zones/types';
 jest.mock('react-native-map-clustering', () => {
   // Return the mocked MapView from jest.setup.js
   const ReactMock = require('react');
-  const { View } = require('react-native');
+  const { View: MockView } = require('react-native');
   const MockMapView = ReactMock.forwardRef((props: any, ref: any) => {
     ReactMock.useImperativeHandle(ref, () => ({
       animateToRegion: jest.fn(),
     }));
-    return ReactMock.createElement(View, { ...props }, props.children);
+    return ReactMock.createElement(MockView, { ...props }, props.children);
   });
   return MockMapView;
 });
@@ -31,24 +32,26 @@ const mockRideState: any = {
 
 jest.mock('../../ride', () => ({
   useRide: () => mockRideState,
-  RideDashboard: () => <mock-ride-dashboard testID="ride-dashboard" />,
-  TripSummary: () => <mock-trip-summary testID="trip-summary" />,
+  RideDashboard: () => <View testID="ride-dashboard" />,
+  TripSummary: () => <View testID="trip-summary" />,
 }));
 
 // Mock ScanScreen
 jest.mock('../../scan', () => ({
   ScanScreen: ({ onScanSuccess, onClose, isRideLocked, onRideLockedAttempt }: any) => (
-    <mock-scan-screen 
-      testID="scan-screen" 
-      onScanSuccess={() => {
-        if (isRideLocked) {
-          onRideLockedAttempt?.();
-          return;
-        }
-        onScanSuccess('3124');
-      }}
-      onClose={onClose}
-    />
+    <View testID="scan-screen">
+      <TouchableOpacity 
+        testID="scan-trigger"
+        onPress={() => {
+          if (isRideLocked) {
+            onRideLockedAttempt?.();
+            return;
+          }
+          onScanSuccess('3124');
+        }}
+      />
+      <TouchableOpacity testID="close-trigger" onPress={onClose} />
+    </View>
   ),
 }));
 
@@ -247,8 +250,13 @@ describe('MapScreen', () => {
 
   it('allows switching cities for zone filtering', () => {
     const { getByTestId, getByText } = render(<MapScreen />);
-    const selector = getByTestId('city-selector');
-    expect(selector).toBeTruthy();
+    
+    // 点击城市选择器按钮打开下拉菜单
+    const selectorButton = getByTestId('city-selector-button');
+    expect(selectorButton).toBeTruthy();
+    fireEvent.press(selectorButton);
+    
+    // 点击 Göteborg 选项
     fireEvent.press(getByText('Göteborg'));
     expect(mockUseZones).toHaveBeenLastCalledWith('Göteborg');
   });
