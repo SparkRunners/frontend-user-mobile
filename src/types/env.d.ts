@@ -9,6 +9,4 @@ declare module '@env' {
   export const GITHUB_CLIENT_SECRET: string;
   export const GITHUB_REDIRECT_URI: string;
   export const SCOOTER_API_BASE_URL: string;
-  export const USE_SIMULATION: string;
-  export const SIMULATION_SOCKET_URL: string;
 }
