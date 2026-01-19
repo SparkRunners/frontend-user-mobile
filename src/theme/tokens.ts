@@ -1,16 +1,23 @@
 export const colors = {
   brand: '#22C55E',
-  brandMuted: '#D1FADF',
-  warning: '#F97316',
+  brandMuted: '#D1FAE5',
+  brandDark: '#16A34A',
+  warning: '#F59E0B',
+  warningMuted: '#FEF3C7',
   danger: '#EF4444',
+  dangerMuted: '#FEE2E2',
   info: '#0EA5E9',
   infoMuted: '#E0F2FE',
-  background: '#F5F7FA',
+  success: '#10B981',
+  background: '#F9FAFB',
+  backgroundSecondary: '#F3F4F6',
   card: '#FFFFFF',
-  border: 'rgba(148, 163, 184, 0.2)',
-  text: '#111827',
-  textMuted: '#6B7280',
+  border: '#E5E7EB',
+  text: '#1F2937',
+  textSecondary: '#6B7280',
+  textMuted: '#9CA3AF',
   iconDisabled: '#94A3B8',
+  overlay: 'rgba(0, 0, 0, 0.5)',
 };
 
 export const spacing = {
@@ -45,6 +52,27 @@ export const shadows = {
     shadowOpacity: 1,
     shadowRadius: 24,
     elevation: 12,
+  },
+  small: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  medium: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  large: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 8,
   },
 };
 

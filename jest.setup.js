@@ -2,9 +2,34 @@
 require('react-native-gesture-handler/jestSetup');
 
 jest.mock('react-native-reanimated', () => {
-  const Reanimated = require('react-native-reanimated/mock');
-  Reanimated.default.call = () => {};
-  return Reanimated;
+  const React = require('react');
+  const { View } = require('react-native');
+  
+  const AnimatedView = React.forwardRef((props, ref) => {
+    return React.createElement(View, { ...props, ref });
+  });
+  
+  const AnimatedModule = {
+    View: AnimatedView,
+    call: () => {},
+    createAnimatedComponent: (component) => component,
+  };
+  
+  return {
+    __esModule: true,
+    default: AnimatedModule,
+    createAnimatedComponent: (component) => component,
+    useSharedValue: (val) => ({ value: val }),
+    useAnimatedStyle: (cb) => cb(),
+    useEvent: (handler) => handler,
+    withSpring: (val) => val,
+    withTiming: (val) => val,
+    runOnJS: (fn) => fn,
+    Easing: {
+      bezier: () => ({ factory: () => (t) => t }),
+    },
+    Animated: AnimatedModule,
+  };
 });
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper', () => ({}), { virtual: true });
