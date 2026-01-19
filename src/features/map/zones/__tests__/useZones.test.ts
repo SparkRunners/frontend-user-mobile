@@ -186,7 +186,7 @@ describe('useZones', () => {
       });
     });
 
-    it('handles empty zones array without error', async () => {
+    it('handles empty zones array as error', async () => {
       mockScooterApi.get.mockResolvedValue({ data: [] });
 
       const { result } = renderHook(() => useZones());
@@ -195,6 +195,7 @@ describe('useZones', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
+      // Empty array is treated as an error (no zones available)
       expect(result.current.error).toBe('Kunde inte hämta zoner. Försök igen.');
       expect(result.current.parkingZones).toEqual([]);
     });

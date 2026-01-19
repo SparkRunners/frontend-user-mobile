@@ -33,7 +33,7 @@ export const RideProvider = ({ children }: { children: ReactNode }) => {
 
   // Timer effect
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (isRiding) {
       interval = setInterval(() => {
         setDurationSeconds(prev => prev + 1);
