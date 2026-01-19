@@ -321,13 +321,46 @@ const mapZoneCheckResult = (payload: unknown): ZoneCheckResult => {
     return { rule: null, nearestParking: null };
   }
 
-  // Backend format: { inZone, rules: { parkAllowed, rideAllowed, maxSpeed, hasCharging }, alert }
   let rule: ZoneRuleMatch | null = null;
 
-  // If outside all zones, allow normal riding (no restrictions)
-  if (source.inZone === false || !source.rules) {
+  // Handle legacy flat format: { rule: 'slow-speed', priority: 60, speedLimitKmh: 15 }
+  const legacyRuleType = readString(source, 'rule');
+  if (legacyRuleType) {
+    const priority = readNumber(source, 'priority') ?? 0;
+    const message = readString(source, 'message');
+    const speedLimitKmh = readNumber(source, 'speedLimitKmh', 'maxSpeed');
+    rule = {
+      type: legacyRuleType as ZoneRuleType,
+      priority,
+      message,
+      speedLimitKmh,
+    };
+  }
+  // Handle array of rules format: { rules: [{rule: 'slow-speed', priority: 40}, ...] }
+  else if (source.rules && Array.isArray(source.rules) && source.rules.length > 0) {
+    const sorted = [...source.rules].sort((a: GenericRecord, b: GenericRecord) => {
+      const aPriority = readNumber(a, 'priority') ?? 0;
+      const bPriority = readNumber(b, 'priority') ?? 0;
+      return bPriority - aPriority;
+    });
+    const highest = sorted[0] as GenericRecord;
+    const priority = readNumber(highest, 'priority') ?? 0;
+    const message = readString(highest, 'message');
+    const speedLimitKmh = readNumber(highest, 'speedLimitKmh', 'maxSpeed');
+    const ruleType = readString(highest, 'rule', 'type');
+    if (ruleType) {
+      rule = {
+        type: ruleType as ZoneRuleType,
+        priority,
+        message,
+        speedLimitKmh,
+      };
+    }
+  }
+  // Backend format: { inZone, rules: { parkAllowed, rideAllowed, maxSpeed, hasCharging }, alert }
+  else if (source.inZone === false || !source.rules) {
     rule = null;
-  } else if (source.rules && typeof source.rules === 'object') {
+  } else if (source.rules && typeof source.rules === 'object' && !Array.isArray(source.rules)) {
     const rules = source.rules as GenericRecord;
     const rideAllowed = rules.rideAllowed === true;
     const parkAllowed = rules.parkAllowed === true;

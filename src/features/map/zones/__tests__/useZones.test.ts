@@ -569,13 +569,14 @@ describe('useZones', () => {
         expect(result.current.error).toBe('Kunde inte hämta zoner. Försök igen.');
       });
 
-      await result.current.refetch();
+      await waitFor(async () => {
+        await result.current.refetch();
+      });
 
       await waitFor(() => {
         expect(result.current.error).toBeNull();
+        expect(result.current.parkingZones).toHaveLength(1);
       });
-
-      expect(result.current.parkingZones).toHaveLength(1);
     });
   });
 
